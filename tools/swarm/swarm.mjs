@@ -31,7 +31,7 @@
  * Nothing touches the base branch: review `swarm/integration` and merge it yourself.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, createWriteStream } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmdirSync, rmSync, unlinkSync, writeFileSync, createWriteStream } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { readQuota, describeQuota, usedPercent } from './quota.mjs';
@@ -96,12 +96,30 @@ function git(args, cwd = ROOT) {
 }
 const gitOk = (/** @type {string[]} */ args, cwd = ROOT) => spawnSync('git', args, { cwd, encoding: 'utf8' }).status === 0;
 
+/**
+ * Remove a worktree dir under .swarm/wt. The node_modules link points at the MAIN checkout's
+ * node_modules, so it is unlinked first and nothing here ever recursively deletes through it.
+ * @param {string} wt
+ */
+function removeWorktreeDir(wt) {
+  if (!existsSync(wt)) return;
+  const nm = join(wt, 'node_modules');
+  try {
+    if (lstatSync(nm).isSymbolicLink()) {
+      try { unlinkSync(nm); } catch { rmdirSync(nm); } // junctions need rmdir on some Windows builds
+    }
+  } catch { /* no link */ }
+  gitOk(['worktree', 'remove', '--force', wt]);
+  if (existsSync(nm)) throw new Error(`refusing to delete ${wt}: ${nm} is still present`);
+  if (existsSync(wt)) rmSync(wt, { recursive: true, force: true });
+  git(['worktree', 'prune']);
+}
+
 /** @param {Task} t */
 function prepareWorktree(t) {
   const wt = join(STATE, 'wt', t.id);
   const branch = `swarm/${t.id}`;
-  // .swarm/wt is ours: if a previous run left a half-made or unregistered directory, clear it.
-  if (existsSync(wt) && !gitOk(['worktree', 'remove', '--force', wt])) rmSync(wt, { recursive: true, force: true });
+  removeWorktreeDir(wt);
   git(['worktree', 'prune']);
   git(['branch', '-f', branch, INTEGRATION]);
   git(['worktree', 'add', wt, branch]);
@@ -442,7 +460,7 @@ async function cmdRetry(/** @type {string} */ id, /** @type {string} */ feedback
 
 function cmdClean() {
   const dir = join(STATE, 'wt');
-  if (existsSync(dir)) for (const d of readdirSync(dir)) gitOk(['worktree', 'remove', '--force', join(dir, d)]);
+  if (existsSync(dir)) for (const d of readdirSync(dir)) removeWorktreeDir(join(dir, d));
   git(['worktree', 'prune']);
   console.log('worktrees removed (branches kept)');
 }
