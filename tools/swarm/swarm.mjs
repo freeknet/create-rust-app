@@ -4,7 +4,7 @@
  * swarm — fan tasks out to parallel Codex workers, one git worktree each.
  *
  *   node tools/swarm/swarm.mjs run [ids...] [-j 3] [--model M] [--effort medium] [--base main]
- *                                  [--repairs 1] [--max-used 85] [--force] [--dry]
+ *                                  [--repairs 2] [--max-used 85] [--force] [--dry]
  *   node tools/swarm/swarm.mjs status            last run's table
  *   node tools/swarm/swarm.mjs log <id>          worker's final report
  *   node tools/swarm/swarm.mjs retry <id> "<feedback>"   resume that worker's thread with feedback
@@ -134,8 +134,11 @@ function prepareWorktree(t) {
 
 /** Changed paths in a worktree vs its branch tip (tracked + untracked, excluding ignored). */
 function changedPaths(/** @type {string} */ wt) {
-  const out = git(['status', '--porcelain', '-uall', '--no-renames'], wt);
-  return out.split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^"|"$/g, '')).filter((p) => p !== 'node_modules');
+  // Not via git(): it trims, which eats the leading status column of the first line (" M x" → "M x").
+  const r = spawnSync('git', ['status', '--porcelain', '-uall', '--no-renames'], { cwd: wt, encoding: 'utf8' });
+  if (r.status !== 0) throw new Error(`git status in ${wt}: ${r.stderr}`);
+  return r.stdout.split('\n').filter((l) => l.length > 3).map((l) => l.slice(3).replace(/^"|"$/g, ''))
+    .filter((p) => p !== 'node_modules' && !p.startsWith('.npm-cache/'));
 }
 
 // ─── prompt ────────────────────────────────────────────────────────────────
@@ -152,8 +155,10 @@ Ground rules:
   C:\\Users\\ADUPU\\Documents\\Development\\strobe.
 - Create or modify ONLY the paths your task owns. Never commit, switch branches or merge (.git is
   read-only for you anyway); the orchestrator commits after checking ownership and running the gate.
-- Run the task's gate yourself and iterate until it passes. Prefer cheap checks while iterating
-  (\`--gate check\`) and the full gate at the end.
+- Run what checks you can. The Windows sandbox may refuse to let Node spawn child processes
+  (\`spawn EPERM\`), which blocks \`node --test\` and the cargo-driven gate scripts: don't fight it or try
+  to escape it. Verify what you can directly (e.g. \`cargo check\` in a scaffolded dir), then finish.
+  The orchestrator runs the real gate outside the sandbox and resumes you with any failure log.
 - Be economical: read what you need, don't re-read large files, don't narrate.
 - Your final message must be the JSON report the output schema asks for.
 
@@ -191,15 +196,20 @@ function runCodex(t, row, o) {
     const wt = join(STATE, 'wt', t.id);
     const home = homedir();
     const args = ['exec'];
-    if (o.resume) args.push('resume', o.resume.thread);
     // ~/.cargo and ~/.rustup: cargo writes its registry cache and toolchains there (outside the
     // workspace). .git is deliberately NOT writable: workers don't commit.
-    args.push('-C', wt, '-s', 'workspace-write', '--json',
-      '-o', join(o.runDir, `${t.id}.last.md`),
+    const roots = [join(home, '.cargo'), join(home, '.rustup')];
+    if (o.resume) {
+      // `exec resume` takes no -C/-s/--add-dir: cwd comes from the spawn, sandbox from config keys.
+      args.push('resume', o.resume.thread, '-c', 'sandbox_mode="workspace-write"',
+        '-c', `sandbox_workspace_write.writable_roots=${JSON.stringify(roots)}`);
+    } else {
+      args.push('-C', wt, '-s', 'workspace-write', '--add-dir', roots[0], '--add-dir', roots[1]);
+    }
+    args.push('--json', '-o', join(o.runDir, `${t.id}.last.md`),
       '-c', 'approval_policy="never"',
       '-c', 'sandbox_workspace_write.network_access=true',
-      '-c', `model_reasoning_effort="${t.effort ?? o.effort}"`,
-      '--add-dir', join(home, '.cargo'), '--add-dir', join(home, '.rustup'));
+      '-c', `model_reasoning_effort="${t.effort ?? o.effort}"`);
     // Windows: the elevated sandbox needs a one-time provisioning step that can break (codex doctor:
     // "elevated Windows sandbox provisioning recorded a structured failure"), after which every shell
     // call fails with "setup refresh had errors". The unelevated backend needs no provisioning;
@@ -314,7 +324,7 @@ async function cmdRun(/** @type {string[]} */ argv) {
   const effort = opt('--effort', 'medium');
   const model = opt('--model', 'gpt-6.1-sol');
   const base = opt('--base', 'main');
-  const repairs = Number(opt('--repairs', '1'));
+  const repairs = Number(opt('--repairs', '2'));
   const maxUsed = Number(opt('--max-used', '85'));
   let tasks = loadTasks();
   if (ids.length) tasks = tasks.filter((t) => ids.includes(t.id));
