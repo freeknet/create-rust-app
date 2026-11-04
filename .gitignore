@@ -4,3 +4,4 @@ dist/
 .swarm/
 *.tgz
 .npm-cache/
+.swarm-*.log
