@@ -1,0 +1,266 @@
+name: Release
+
+# Tagging is the trigger: `git tag -a v0.1.0 -m "@@name@@ v0.1.0" &&
+# git push origin v0.1.0`. The release is created as a draft, the archive
+# is attached to it, and it is only published once the build has
+# succeeded, so a failed build leaves an unpublished draft rather than a
+# half-populated public release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build a release from (e.g. v0.1.0)"
+        required: true
+
+# Least privilege by default. The build below runs third-party code (every
+# crate's build script) and needs to read the repository and nothing else;
+# `draft` and `publish` ask for more, individually.
+permissions:
+  contents: read
+
+# One run per tag at a time, queued rather than cancelled: two runs racing
+# each other's uploads onto the same draft is how a release ends up with
+# archives from one build and checksums from the other.
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  draft:
+    name: Create draft release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Resolve tag
+        id: resolve
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.resolve.outputs.tag }}
+
+      # A tag that disagrees with Cargo.toml would ship a binary whose
+      # `--version` contradicts its release page, and cannot be fixed
+      # afterwards because a published tag is never moved. Catch it before
+      # any build minutes are spent.
+      - name: Check the tag matches the Cargo.toml version
+        shell: bash
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+# @if workspace
+          version=$(awk '/^\[workspace.package\]/{in_pkg=1; next} /^\[/{in_pkg=0} in_pkg && /^version *=/{gsub(/[" ]/, "", $0); sub(/^version=/, "", $0); print; exit}' Cargo.toml)
+# @else
+          version=$(awk '/^\[package\]/{in_pkg=1; next} /^\[/{in_pkg=0} in_pkg && /^version *=/{gsub(/[" ]/, "", $0); sub(/^version=/, "", $0); print; exit}' Cargo.toml)
+# @end
+          if [ "v${version}" != "${TAG}" ]; then
+            echo "Tag ${TAG} does not match the version in Cargo.toml (${version})."
+            echo "Bump the version before tagging."
+            exit 1
+          fi
+
+      - name: Create draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, reusing it."
+          else
+            gh release create "$TAG" \
+              --draft \
+              --title "@@displayName@@ $TAG" \
+              --generate-notes
+          fi
+
+  build:
+    name: ${{ matrix.target }}
+    needs: draft
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The matrix stays a matrix so adding a target later is an entry
+          # rather than a rewrite.
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      # Pinned to full SHAs, as in ci.yml: a mutable action tag inside a
+      # workflow that holds a release-writing token is exactly the blast
+      # radius this pins away.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.draft.outputs.tag }}
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10
+        with:
+          toolchain: "@@toolchain@@"
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: release-${{ matrix.target }}
+
+      - name: Build
+# @if workspace
+        run: cargo build --release -p @@appCrate@@ --bins --target ${{ matrix.target }}
+# @else
+        run: cargo build --release --bins --target ${{ matrix.target }}
+# @end
+
+      - name: Package
+        shell: bash
+        env:
+          TAG: ${{ needs.draft.outputs.tag }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          name="@@name@@-${TAG}-${TARGET}"
+          staging="dist/${name}"
+          mkdir -p "$staging"
+
+          cp "target/${TARGET}/release/@@appCrate@@.exe" "$staging/"
+          cp README.md LICENSE* "$staging/"
+# @if has_gui & themes
+          # The theme catalog travels with the binary. It is compiled in,
+          # so the app runs without it, but it is also the worked example
+          # anyone writing a theme starts from.
+# @if workspace
+          cp crates/@@appCrate@@/assets/themes.toml "$staging/"
+# @else
+          cp assets/themes.toml "$staging/"
+# @end
+# @end
+
+          cd dist
+          7z a -tzip "${name}.zip" "$name" >/dev/null
+
+      # A CycloneDX SBOM naming every crate in the build, so a consumer can
+      # audit what the binary contains without taking this workflow's word
+      # for it.
+      - name: Build the SBOM
+        shell: bash
+        env:
+          TAG: ${{ needs.draft.outputs.tag }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          # An exact version, not "latest": `--locked` alone pins this
+          # tool's dependencies, not the tool itself, so a re-run months
+          # later could emit a differently shaped SBOM.
+          cargo install cargo-cyclonedx --version 0.5.9 --locked
+# @if workspace
+          # cargo-cyclonedx writes one file per workspace member, each into
+          # its own crate directory. Only the shipped package's is kept.
+          cargo cyclonedx \
+            --manifest-path crates/@@appCrate@@/Cargo.toml \
+            --format json \
+            --target "$TARGET" \
+            --override-filename @@name@@.cdx
+          cp crates/@@appCrate@@/@@name@@.cdx.json "dist/@@name@@-${TAG}-sbom.cdx.json"
+# @else
+          cargo cyclonedx --format json --target "$TARGET" --override-filename @@name@@.cdx
+          cp @@name@@.cdx.json "dist/@@name@@-${TAG}-sbom.cdx.json"
+# @end
+
+      # Checksums travel with the artifacts so a download can be verified
+      # without trusting the transfer. Git Bash on the Windows runner ships
+      # `sha256sum`; `certutil` is the fallback.
+      - name: Checksums
+        shell: bash
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          for file in *.zip *.cdx.json; do
+            if command -v sha256sum >/dev/null; then
+              sha256sum "$file" > "$file.sha256"
+            else
+              digest=$(certutil -hashfile "$file" SHA256 | sed -n 2p | tr -d '\r ')
+              printf '%s  %s\n' "$digest" "$file" > "$file.sha256"
+            fi
+          done
+
+      # One artifact per target: a second matrix job uploading to the same
+      # name fails outright, and a shared name is how one platform's files
+      # get mixed into another's release.
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets-${{ matrix.target }}
+          path: |
+            dist/*.zip
+            dist/*.cdx.json
+            dist/*.sha256
+
+  publish:
+    name: Publish release
+    needs: [draft, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      # For the attestations below: the OIDC token that proves which
+      # workflow, at which commit, produced these bytes.
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.draft.outputs.tag }}
+
+      - name: Download archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          # `pattern`, not `name`: `name` is an exact artifact name with no
+          # glob semantics.
+          pattern: release-assets-*
+          path: dist
+          merge-multiple: true
+
+      # Signed build provenance for the archive and the SBOM, verifiable
+      # with `gh attestation verify <file> -R @@github@@/@@name@@`.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.zip
+            dist/*.cdx.json
+
+      # The SBOM again as a real SBOM attestation, so the CycloneDX document
+      # is cryptographically bound to the archive it describes.
+      - name: Attest SBOM
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: dist/*.zip
+          sbom-path: dist/@@name@@-${{ needs.draft.outputs.tag }}-sbom.cdx.json
+
+      - name: Upload and undraft
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.draft.outputs.tag }}
+        run: |
+          set -euo pipefail
+          cd dist
+          gh release upload "$TAG" $(find . -type f) --clobber
+          gh release edit "$TAG" --draft=false --latest

@@ -1,0 +1,62 @@
+name: Publish
+
+# A library ships as a crate, not an archive, so there is no binary release:
+# publishing to crates.io is a deliberate, manual step. Run it from the
+# tag you are publishing:
+#
+#   gh workflow run publish.yml --ref v0.1.0
+#
+# It needs a `CARGO_REGISTRY_TOKEN` repository secret (a crates.io API token
+# scoped to publish-update for this crate). A published version can never
+# be replaced, only yanked, which is why the dry run comes first.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never two publishes of the same ref at once.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10
+        with:
+          toolchain: "@@toolchain@@"
+
+      # A ref that is not a version tag matching Cargo.toml would publish a
+      # version nobody can find in the history.
+      - name: Check the ref matches the Cargo.toml version
+        shell: bash
+        env:
+          REF: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version=$(awk '/^\[package\]/{in_pkg=1; next} /^\[/{in_pkg=0} in_pkg && /^version *=/{gsub(/[" ]/, "", $0); sub(/^version=/, "", $0); print; exit}' Cargo.toml)
+          if [ "v${version}" != "${REF}" ]; then
+            echo "Run this workflow from the tag v${version} (got ${REF})."
+            exit 1
+          fi
+
+      # Packages the crate exactly as crates.io would receive it and builds
+      # that package in isolation: a file missing from `include`, or a path
+      # dependency, fails here rather than after the upload.
+      - name: Dry run
+        run: cargo publish --dry-run
+
+      - name: Publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish

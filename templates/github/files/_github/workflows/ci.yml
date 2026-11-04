@@ -1,0 +1,167 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A second push to the same branch makes the first run's result irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege by default: nothing in this workflow writes to the
+# repository, so the token it runs with can only read it. A job that needs
+# more says so itself.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Incremental compilation helps a developer's next edit, never a fresh
+  # runner: it only makes the cache bigger and slower to save and restore.
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  format:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    # Every job has a timeout, well above its slowest cold-cache run, so a
+    # hung test fails in minutes rather than holding a runner for GitHub's
+    # default six hours.
+    timeout-minutes: 10
+    steps:
+      # Pinned to full SHAs: a mutable tag in a workflow is a supply-chain
+      # risk the moment the workflow holds a write-capable token. Update
+      # deliberately, with a diff of the new SHA, not silently on the next
+      # run. The versions are in the trailing comments.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The version matches rust-toolchain.toml, so CI and a local checkout
+      # run the same rustfmt and the same clippy. `@stable` would mean CI
+      # silently moving to each new release on its own.
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10
+        with:
+          toolchain: "@@toolchain@@"
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+# @if cargoDeny
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The dependency surface does not vary by runner (`deny.toml` names the
+    # targets it resolves for), so one run suffices. Reads only: the action
+    # downloads the advisory database and scans the lockfile.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check
+          arguments: --all-features
+
+# @end
+  windows:
+    name: windows
+    runs-on: windows-latest
+    timeout-minutes: 60
+# @if has_gui
+    # The authoritative job: Windows is the platform the app ships for, and
+    # this is the only runner that links and runs the whole of it.
+# @end
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10
+        with:
+          toolchain: "@@toolchain@@"
+          components: clippy
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: windows
+
+      # `--all-targets` covers the examples and tests too, so nothing that
+      # only `cargo run --example` would build can rot silently.
+      - name: Clippy
+# @if workspace
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+# @else
+        run: cargo clippy --all-targets --all-features -- -D warnings
+# @end
+
+      - name: Test
+# @if workspace
+        run: cargo test --workspace --all-features
+# @else
+        run: cargo test --all-features
+# @end
+# @if has_bin
+
+      # Release is where `panic = "abort"`, LTO and one codegen unit apply.
+      # Those change what compiles: a `catch_unwind` that builds in debug
+      # does not build under `panic = "abort"`, and this is the step that
+      # says so before a tag does.
+      - name: Build release binaries
+# @if workspace
+        run: cargo build --release --workspace --bins
+# @else
+        run: cargo build --release --bins
+# @end
+# @end
+
+  linux:
+    name: linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+# @if has_gui
+    # Not redundant with the Windows job: it is the fastest signal on the
+    # board, and the cross-check below type-checks the Windows-only code
+    # without linking anything, so a Linux push fails fast on a
+    # Windows-only mistake.
+# @end
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10
+        with:
+          toolchain: "@@toolchain@@"
+          components: clippy
+# @if has_gui
+          # The Windows std, for the cross-check below. Adding the target
+          # costs a download; it does not install a linker, and does not
+          # need to.
+          targets: x86_64-pc-windows-msvc
+# @end
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: linux
+
+      - name: Clippy
+# @if workspace
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+# @else
+        run: cargo clippy --all-targets --all-features -- -D warnings
+# @end
+
+      - name: Test
+# @if workspace
+        run: cargo test --workspace --all-features
+# @else
+        run: cargo test --all-features
+# @end
+# @if has_gui
+
+      # `clippy --target x86_64-pc-windows-msvc` type-checks the Win32 layer
+      # without linking, so a broken `unsafe extern` block or an egui API
+      # that moved fails here in a minute. The Windows job above is still
+      # the authority; this one just fails first, and cheaply.
+      - name: Cross-check the Windows build
+# @if workspace
+        run: cargo clippy --workspace --all-targets --all-features --target x86_64-pc-windows-msvc -- -D warnings
+# @else
+        run: cargo clippy --all-targets --all-features --target x86_64-pc-windows-msvc -- -D warnings
+# @end
+# @end
