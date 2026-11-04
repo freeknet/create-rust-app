@@ -3,11 +3,13 @@
 /**
  * swarm — fan tasks out to parallel Codex workers, one git worktree each.
  *
- *   node tools/swarm/swarm.mjs run [ids...] [-j 4] [--model M] [--effort high] [--base main] [--dry]
+ *   node tools/swarm/swarm.mjs run [ids...] [-j 3] [--model M] [--effort medium] [--base main]
+ *                                  [--repairs 1] [--max-used 85] [--force] [--dry]
  *   node tools/swarm/swarm.mjs status            last run's table
  *   node tools/swarm/swarm.mjs log <id>          worker's final report
  *   node tools/swarm/swarm.mjs retry <id> "<feedback>"   resume that worker's thread with feedback
  *   node tools/swarm/swarm.mjs clean             remove worktrees (keeps branches)
+ *   node tools/swarm/swarm.mjs quota             plan usage windows (reads the account; spends nothing)
  *   node tools/swarm/swarm.mjs prepare <id>      create the task's worktree (for a non-Codex worker)
  *   node tools/swarm/swarm.mjs finish <id>       ownership check + gate + commit + merge a worktree
  *
@@ -32,6 +34,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, createWriteStream } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
+import { readQuota, describeQuota, usedPercent } from './quota.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..', '..');
 const TASKS = join(ROOT, 'tools', 'swarm', 'tasks');
@@ -117,28 +120,39 @@ function changedPaths(/** @type {string} */ wt) {
 }
 
 // ─── prompt ────────────────────────────────────────────────────────────────
+// The preamble is byte-identical for every worker and comes first, so Codex's prompt cache serves it
+// to workers 2..N at ~10% of the input price. Everything task-specific goes after it.
+const PREAMBLE = `You are one of several Codex workers building \`create-rust-app\` in parallel. Each worker owns a
+disjoint set of paths in its own git worktree (your working directory), and an orchestrator verifies
+and merges the results.
+
+Ground rules:
+- Read AGENTS.md, docs/PLAN.md and docs/CONTRACTS.md first. The core engine (src/engine, src/context,
+  src/presets, src/gen) exists and is tested; read it to see exactly how templates render.
+- Reference repos (read-only): C:\\Users\\ADUPU\\Documents\\Development\\rustaman and
+  C:\\Users\\ADUPU\\Documents\\Development\\strobe.
+- Create or modify ONLY the paths your task owns. Never commit, switch branches or merge (.git is
+  read-only for you anyway); the orchestrator commits after checking ownership and running the gate.
+- Run the task's gate yourself and iterate until it passes. Prefer cheap checks while iterating
+  (\`--gate check\`) and the full gate at the end.
+- Be economical: read what you need, don't re-read large files, don't narrate.
+- Your final message must be the JSON report the output schema asks for.
+
+──────────────────────────────── task ────────────────────────────────
+`;
+
 /** @param {Task} t */
 function promptFor(t) {
-  return `You are one of several Codex workers building \`create-rust-app\` in parallel. Each worker owns a
-disjoint set of paths in its own git worktree (your working directory).
-
-Your task: **${t.title}** (id: ${t.id})
-
-Paths you own (you may create/modify ONLY these): ${t.owns.map((o) => '`' + o + '`').join(', ')}
-
-First read AGENTS.md, docs/PLAN.md and docs/CONTRACTS.md. The core engine in src/engine, src/context.js,
-src/presets.js and src/gen/header.js already exists and is tested; read it to see exactly how
-templates are rendered. Reference repos (read-only): C:\\Users\\ADUPU\\Documents\\Development\\rustaman and
-C:\\Users\\ADUPU\\Documents\\Development\\strobe.
-
-Do not commit, switch branches or merge — the orchestrator commits your work after checking that you
-stayed inside your paths${t.gate ? ` and that this gate passes:\n\n    ${t.gate}\n\nRun that gate yourself before finishing and iterate until it passes` : ''}.
+  return `${PREAMBLE}
+Task: ${t.title} (id: ${t.id})
+Owned paths: ${t.owns.map((o) => '`' + o + '`').join(', ')}
+Gate: ${t.gate ?? '(none)'}
 
 ${t.body}
-
-End with a short report: files created, commands you ran to verify and their results, and anything
-unfinished or any contract you think should change.`;
+`;
 }
+
+const SCHEMA = join(ROOT, 'tools', 'swarm', 'report.schema.json');
 
 // ─── run ───────────────────────────────────────────────────────────────────
 /**
@@ -154,12 +168,15 @@ function runCodex(t, row, o) {
     const home = homedir();
     const args = ['exec'];
     if (o.resume) args.push('resume', o.resume.thread);
+    // ~/.cargo and ~/.rustup: cargo writes its registry cache and toolchains there (outside the
+    // workspace). .git is deliberately NOT writable: workers don't commit.
     args.push('-C', wt, '-s', 'workspace-write', '--json',
       '-o', join(o.runDir, `${t.id}.last.md`),
+      '-c', 'approval_policy="never"',
       '-c', 'sandbox_workspace_write.network_access=true',
       '-c', `model_reasoning_effort="${t.effort ?? o.effort}"`,
-      '--add-dir', join(home, '.cargo'), '--add-dir', join(home, '.rustup'),
-      '--add-dir', join(ROOT, '.git'));
+      '--add-dir', join(home, '.cargo'), '--add-dir', join(home, '.rustup'));
+    if (!o.resume) args.push('--output-schema', SCHEMA);
     args.push('-m', t.model ?? o.model);
     args.push('-');
     const log = createWriteStream(join(o.runDir, `${t.id}.jsonl`), { flags: 'a' });
@@ -225,8 +242,9 @@ async function finish(t, row) {
   if (t.gate) {
     row.state = 'gating';
     row.last = `gate: ${t.gate}`;
-    const code = await runGate(t.gate, wt, join(STATE, 'runs', row.run, `${t.id}.gate.log`));
-    if (code !== 0) throw new Error(`gate failed (see .swarm/runs/${row.run}/${t.id}.gate.log)`);
+    const logFile = join(STATE, 'runs', row.run, `${t.id}.gate.log`);
+    const code = await runGate(t.gate, wt, logFile);
+    if (code !== 0) throw Object.assign(new Error(`gate failed (see .swarm/runs/${row.run}/${t.id}.gate.log)`), { gateLog: logFile });
   }
   git(['add', '-A', '--', ...changed], wt);
   git(['-c', 'user.name=swarm', '-c', 'user.email=swarm@localhost', 'commit', '-qm', `feat(${t.id}): ${t.title}\n\nBuilt by a Codex worker via tools/swarm.`], wt);
@@ -243,7 +261,8 @@ async function finish(t, row) {
 function render(rows, frame) {
   const w = Math.max(60, process.stdout.columns ?? 100);
   const now = Date.now();
-  const lines = [rainbow('◆ swarm', frame * 6) + dim(` · ${rows.filter((r) => r.state === 'merged').length}/${rows.length} merged · codex × ${rows.filter((r) => r.state === 'running').length} live`), ''];
+  const q = /** @type {any} */ (globalThis).__swarmQuota;
+  const lines = [rainbow('◆ swarm', frame * 6) + dim(` · ${rows.filter((r) => r.state === 'merged').length}/${rows.length} merged · codex × ${rows.filter((r) => r.state === 'running').length} live${q ? ` · ${Math.round(usedPercent(q))}% of plan window used` : ''}`), ''];
   for (const [i, r] of rows.entries()) {
     const secs = r.started ? Math.round(((r.ended ?? now) - r.started) / 1000) : 0;
     const t = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
@@ -265,6 +284,8 @@ async function cmdRun(/** @type {string[]} */ argv) {
   const effort = opt('--effort', 'medium');
   const model = opt('--model', 'gpt-6.1-sol');
   const base = opt('--base', 'main');
+  const repairs = Number(opt('--repairs', '1'));
+  const maxUsed = Number(opt('--max-used', '85'));
   let tasks = loadTasks();
   if (ids.length) tasks = tasks.filter((t) => ids.includes(t.id));
   if (!tasks.length) { console.error('no tasks'); process.exit(2); }
@@ -273,6 +294,20 @@ async function cmdRun(/** @type {string[]} */ argv) {
     return;
   }
   if (git(['status', '--porcelain', '--untracked-files=no'])) console.warn(dim('note: uncommitted changes in the main checkout are not visible to workers'));
+  // Preflight: never start a run that the plan's usage windows can't carry.
+  let quota = await readQuota();
+  /** @type {any} */ (globalThis).__swarmQuota = quota;
+  console.log(dim(describeQuota(quota)));
+  if (quota && (!quota.allowed || usedPercent(quota) >= maxUsed) && !argv.includes('--force')) {
+    console.error(`usage is at ${Math.round(usedPercent(quota))}% (limit --max-used ${maxUsed}); not starting. Pass --force to override.`);
+    process.exit(3);
+  }
+  let throttled = false;
+  const quotaTimer = setInterval(async () => {
+    quota = await readQuota();
+    /** @type {any} */ (globalThis).__swarmQuota = quota;
+    throttled = !!quota && (!quota.allowed || usedPercent(quota) >= maxUsed);
+  }, 90_000);
   if (!gitOk(['rev-parse', '--verify', INTEGRATION])) git(['branch', INTEGRATION, base]);
   const run = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const runDir = join(STATE, 'runs', run);
@@ -303,7 +338,7 @@ async function cmdRun(/** @type {string[]} */ argv) {
         const row = /** @type {Row} */ (byId.get(t.id));
         if (row.state !== 'waiting') continue;
         if (doomed(t)) { row.state = 'skipped'; row.last = 'a dependency failed'; continue; }
-        if (!ready(t) || live.length >= jobs) continue;
+        if (!ready(t) || live.length >= jobs || throttled) continue;
         row.state = 'running';
         row.started = Date.now();
         row.last = 'preparing worktree';
@@ -312,7 +347,21 @@ async function cmdRun(/** @type {string[]} */ argv) {
             prepareWorktree(t);
             const code = await runCodex(t, row, { model, effort, runDir });
             if (code !== 0) throw new Error(row.limited ? `usage limit hit — partial work kept in .swarm/wt/${t.id}; resume with: swarm retry ${t.id} "continue"` : `codex exited ${code}`);
-            await finish(t, row);
+            for (let attempt = 0; ; attempt++) {
+              try {
+                await finish(t, row);
+                break;
+              } catch (e) {
+                const gateLog = /** @type {any} */ (e)?.gateLog;
+                if (!gateLog || attempt >= repairs || !row.thread) throw e;
+                // Repair turn: resume the same thread (cached context — cheap) with the gate's tail.
+                row.state = 'running';
+                row.last = `repair ${attempt + 1}/${repairs}: gate failed`;
+                const tail = readFileSync(gateLog, 'utf8').split('\n').slice(-80).join('\n');
+                const rc = await runCodex(t, row, { model, effort, runDir, resume: { thread: row.thread, feedback: `The orchestrator ran your gate and it FAILED. Last 80 lines:\n\n${tail}\n\nFix the cause (stay inside your owned paths), re-run the gate until it passes, then reply with the JSON report again.` } });
+                if (rc !== 0) throw new Error(row.limited ? 'usage limit hit during repair' : `codex exited ${rc} during repair`);
+              }
+            }
             row.state = 'merged';
             row.last = 'merged into swarm/integration';
           } catch (e) {
@@ -331,6 +380,7 @@ async function cmdRun(/** @type {string[]} */ argv) {
     pump();
   });
   clearInterval(timer);
+  clearInterval(quotaTimer);
   draw();
   save();
   if (!process.stdout.isTTY) for (const r of rows) console.log(`${r.state.padEnd(8)} ${r.id} ${r.error ?? ''}`);
@@ -405,6 +455,7 @@ const [cmd, ...rest] = process.argv.slice(2);
 try {
   if (cmd === 'run') await cmdRun(rest);
   else if (cmd === 'prepare') cmdPrepare(rest[0]);
+  else if (cmd === 'quota') console.log(describeQuota(await readQuota()));
   else if (cmd === 'finish') await cmdFinish(rest[0]);
   else if (cmd === 'status') cmdStatus();
   else if (cmd === 'log') cmdLog(rest[0]);

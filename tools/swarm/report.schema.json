@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SwarmWorkerReport",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "summary", "files", "verification", "unfinished", "contractChanges"],
+  "properties": {
+    "status": { "type": "string", "enum": ["done", "partial", "blocked"] },
+    "summary": { "type": "string", "description": "Two or three sentences on what was built." },
+    "files": { "type": "array", "items": { "type": "string" }, "description": "Repo-relative paths created or modified." },
+    "verification": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "passed", "note"],
+        "properties": {
+          "command": { "type": "string" },
+          "passed": { "type": "boolean" },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "unfinished": { "type": "array", "items": { "type": "string" } },
+    "contractChanges": { "type": "array", "items": { "type": "string" }, "description": "Contracts (docs/CONTRACTS.md, shared seams) you think must change, and why." }
+  }
+}
