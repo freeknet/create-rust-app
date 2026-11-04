@@ -3,3 +3,4 @@ dist/
 .scratch/
 .swarm/
 *.tgz
+.npm-cache/

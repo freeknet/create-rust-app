@@ -7,7 +7,7 @@ type Row = { id: string, title: string, state: 'waiting'|'running'|'gating'|'mer
  * swarm — fan tasks out to parallel Codex workers, one git worktree each.
  *
  *   node tools/swarm/swarm.mjs run [ids...] [-j 3] [--model M] [--effort medium] [--base main]
- *                                  [--repairs 1] [--max-used 85] [--force] [--dry]
+ *                                  [--repairs 2] [--max-used 85] [--force] [--dry]
  *   node tools/swarm/swarm.mjs status            last run's table
  *   node tools/swarm/swarm.mjs log <id>          worker's final report
  *   node tools/swarm/swarm.mjs retry <id> "<feedback>"   resume that worker's thread with feedback
@@ -34,7 +34,7 @@ type Row = { id: string, title: string, state: 'waiting'|'running'|'gating'|'mer
  * Nothing touches the base branch: review `swarm/integration` and merge it yourself.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, createWriteStream } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmdirSync, rmSync, unlinkSync, writeFileSync, createWriteStream } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { readQuota, describeQuota, usedPercent } from './quota.ts';
@@ -100,11 +100,29 @@ function git(args: string[], cwd: string | undefined = ROOT) {
 }
 const gitOk = (/** @type {string[]} */ args: string[], cwd: string = ROOT) => spawnSync('git', args, { cwd, encoding: 'utf8' }).status === 0;
 
+/**
+ * Remove a worktree dir under .swarm/wt. The node_modules link points at the MAIN checkout's
+ * node_modules, so it is unlinked first and nothing here ever recursively deletes through it.
+ */
+function removeWorktreeDir(wt: string): void {
+  if (!existsSync(wt)) return;
+  const nm = join(wt, 'node_modules');
+  try {
+    if (lstatSync(nm).isSymbolicLink()) {
+      try { unlinkSync(nm); } catch { rmdirSync(nm); } // junctions need rmdir on some Windows builds
+    }
+  } catch { /* no link */ }
+  gitOk(['worktree', 'remove', '--force', wt]);
+  if (existsSync(nm)) throw new Error(`refusing to delete ${wt}: ${nm} is still present`);
+  if (existsSync(wt)) rmSync(wt, { recursive: true, force: true });
+  git(['worktree', 'prune']);
+}
+
 /** @param {Task} t */
 function prepareWorktree(t: Task) {
   const wt = join(STATE, 'wt', t.id);
   const branch = `swarm/${t.id}`;
-  if (existsSync(wt)) git(['worktree', 'remove', '--force', wt]);
+  removeWorktreeDir(wt);
   git(['worktree', 'prune']);
   git(['branch', '-f', branch, INTEGRATION]);
   git(['worktree', 'add', wt, branch]);
@@ -118,9 +136,12 @@ function prepareWorktree(t: Task) {
 }
 
 /** Changed paths in a worktree vs its branch tip (tracked + untracked, excluding ignored). */
-function changedPaths(/** @type {string} */ wt: string) {
-  const out = git(['status', '--porcelain', '-uall', '--no-renames'], wt);
-  return out.split('\n').filter(Boolean).map((l: string) => l.slice(3).replace(/^"|"$/g, '')).filter((p: string) => p !== 'node_modules');
+function changedPaths(wt: string): string[] {
+  // Not via git(): it trims, which eats the leading status column of the first line (" M x" → "M x").
+  const r = spawnSync('git', ['status', '--porcelain', '-uall', '--no-renames'], { cwd: wt, encoding: 'utf8' });
+  if (r.status !== 0) throw new Error(`git status in ${wt}: ${r.stderr}`);
+  return r.stdout.split('\n').filter((l) => l.length > 3).map((l) => l.slice(3).replace(/^"|"$/g, ''))
+    .filter((p) => p !== 'node_modules' && !p.startsWith('.npm-cache/'));
 }
 
 // ─── prompt ────────────────────────────────────────────────────────────────
@@ -137,8 +158,10 @@ Ground rules:
   C:\\Users\\ADUPU\\Documents\\Development\\strobe.
 - Create or modify ONLY the paths your task owns. Never commit, switch branches or merge (.git is
   read-only for you anyway); the orchestrator commits after checking ownership and running the gate.
-- Run the task's gate yourself and iterate until it passes. Prefer cheap checks while iterating
-  (\`--gate check\`) and the full gate at the end.
+- Run what checks you can. The Windows sandbox may refuse to let Node spawn child processes
+  (\`spawn EPERM\`), which blocks \`node --test\` and the cargo-driven gate scripts: don't fight it or try
+  to escape it. Verify what you can directly (e.g. \`cargo check\` in a scaffolded dir), then finish.
+  The orchestrator runs the real gate outside the sandbox and resumes you with any failure log.
 - Be economical: read what you need, don't re-read large files, don't narrate.
 - Your final message must be the JSON report the output schema asks for.
 
@@ -158,6 +181,11 @@ ${t.body}
 
 const SCHEMA = join(ROOT, 'tools', 'swarm', 'report.schema.json');
 
+/** The worker's structured final report, if it wrote one. */
+function readReport(file: string): { status?: string; summary?: string } | null {
+  try { return JSON.parse(readFileSync(file, 'utf8')) as { status?: string; summary?: string }; } catch { return null; }
+}
+
 // ─── run ───────────────────────────────────────────────────────────────────
 /**
  * @typedef {{ id: string, title: string, state: 'waiting'|'running'|'gating'|'merged'|'failed'|'skipped',
@@ -171,15 +199,25 @@ function runCodex(t: Task, row: Row, o: { model?: string; effort: string; runDir
     const wt = join(STATE, 'wt', t.id);
     const home = homedir();
     const args = ['exec'];
-    if (o.resume) args.push('resume', o.resume.thread);
     // ~/.cargo and ~/.rustup: cargo writes its registry cache and toolchains there (outside the
     // workspace). .git is deliberately NOT writable: workers don't commit.
-    args.push('-C', wt, '-s', 'workspace-write', '--json',
-      '-o', join(o.runDir, `${t.id}.last.md`),
+    const roots = [join(home, '.cargo'), join(home, '.rustup')];
+    if (o.resume) {
+      // `exec resume` takes no -C/-s/--add-dir: cwd comes from the spawn, sandbox from config keys.
+      args.push('resume', o.resume.thread, '-c', 'sandbox_mode="workspace-write"',
+        '-c', `sandbox_workspace_write.writable_roots=${JSON.stringify(roots)}`);
+    } else {
+      args.push('-C', wt, '-s', 'workspace-write', '--add-dir', roots[0] ?? '', '--add-dir', roots[1] ?? '');
+    }
+    args.push('--json', '-o', join(o.runDir, `${t.id}.last.md`),
       '-c', 'approval_policy="never"',
       '-c', 'sandbox_workspace_write.network_access=true',
-      '-c', `model_reasoning_effort="${t.effort ?? o.effort}"`,
-      '--add-dir', join(home, '.cargo'), '--add-dir', join(home, '.rustup'));
+      '-c', `model_reasoning_effort="${t.effort ?? o.effort}"`);
+    // Windows: the elevated sandbox needs a one-time provisioning step that can break (codex doctor:
+    // "elevated Windows sandbox provisioning recorded a structured failure"), after which every shell
+    // call fails with "setup refresh had errors". The unelevated backend needs no provisioning;
+    // its network isolation is weaker, which doesn't matter here (workers get network anyway).
+    if (process.platform === 'win32') args.push('-c', `windows.sandbox="${process.env['SWARM_WINDOWS_SANDBOX'] ?? 'unelevated'}"`);
     if (!o.resume) args.push('--output-schema', SCHEMA);
     const model = t.model ?? o.model;
     if (model !== undefined) args.push('-m', model);
@@ -291,7 +329,7 @@ async function cmdRun(/** @type {string[]} */ argv: string[]) {
   const effort = opt('--effort', 'medium');
   const model = opt('--model', 'gpt-6.1-sol');
   const base = opt('--base', 'main');
-  const repairs = Number(opt('--repairs', '1'));
+  const repairs = Number(opt('--repairs', '2'));
   const maxUsed = Number(opt('--max-used', '85'));
   let tasks = loadTasks();
   if (ids.length) tasks = tasks.filter((t: Task) => ids.includes(t.id));
@@ -351,10 +389,15 @@ async function cmdRun(/** @type {string[]} */ argv: string[]) {
         row.last = 'preparing worktree';
         let p: Promise<void> | undefined;
         p = (async () => {
+          // Yield first: a synchronous throw below would otherwise reach `finally` before `p` is
+          // assigned, and splice(indexOf(undefined)) would drop a different worker from `live`.
+          await null;
           try {
             prepareWorktree(t);
             const code = await runCodex(t, row, { model, effort, runDir });
             if (code !== 0) throw new Error(row.limited ? `usage limit hit — partial work kept in .swarm/wt/${t.id}; resume with: swarm retry ${t.id} "continue"` : `codex exited ${code}`);
+            const report = readReport(join(runDir, `${t.id}.last.md`));
+            if (report?.status === 'blocked') throw new Error(`worker blocked: ${report.summary ?? 'no summary'}`);
             for (let attempt = 0; ; attempt++) {
               try {
                 await finish(t, row);
@@ -434,7 +477,7 @@ async function cmdRetry(/** @type {string} */ id: string, /** @type {string} */ 
 
 function cmdClean() {
   const dir = join(STATE, 'wt');
-  if (existsSync(dir)) for (const d of readdirSync(dir)) gitOk(['worktree', 'remove', '--force', join(dir, d)]);
+  if (existsSync(dir)) for (const d of readdirSync(dir)) removeWorktreeDir(join(dir, d));
   git(['worktree', 'prune']);
   console.log('worktrees removed (branches kept)');
 }

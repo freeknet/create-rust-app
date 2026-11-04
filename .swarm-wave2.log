@@ -1,0 +1,6 @@
+quota: plus · 5h 16% used (resets Nov 4, 3:38 PM) · 7d 3% used (resets Nov 11, 10:38 AM)
+failed   typescript edited outside owned paths: ocs/CONTRACTS.md, .npm-cache/_cacache/content-v2/sha512/4c/91/7574230d4691bb7e4eb12c1c32bd57f759ee9f06fd7840b75ced4d71bc52818165f1b31de30007a4926463f9071545c4657c4b5ca7679f737a740d151ac5, .npm-cache/_cacache/content-v2/sha512/a5/e1/c88cbb4a7d0eec048dd97b16b4f50d0b83f91543c0722c738bde080925fb4f2b19c5a5c2cf87c952f1a1dfb7cbf5d6a0a9034eb651364f9144ef9c0345eb, .npm-cache/_cacache/content-v2/sha512/b4/6e/7aa4c4f934d6bd6e718cd85237d78a143273265cb12682eebf5f907de5b654a3c86034928b7a8cc513bebb89157e13c7a4eefce4b197b3c301522aedad07, .npm-cache/_cacache/index-v5/58/f0/4fe556f104b09be642895a82afa463fe560d9a0dc8f507efeef825a6905e, .npm-cache/_cacache/index-v5/ec/53/cf9e1f42383fafed522b17322f046a34343f1753c12672157b532e47c259 …
+merged   gui-glow 
+failed   workspace codex exited 2 during repair
+
+reports: .swarm/runs/2026-11-04T19-05-49/<id>.last.md   review: git log --oneline main..swarm/integration

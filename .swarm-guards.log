@@ -1,0 +1,4 @@
+quota: plus · 5h 0% used (resets Nov 4, 3:38 PM) · 7d 0% used (resets Nov 11, 10:38 AM)
+merged   guards 
+
+reports: .swarm/runs/2026-11-04T18-38-20/<id>.last.md   review: git log --oneline main..swarm/integration
