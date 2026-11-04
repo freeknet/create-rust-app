@@ -31,7 +31,7 @@
  * Nothing touches the base branch: review `swarm/integration` and merge it yourself.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, createWriteStream } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, createWriteStream } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { readQuota, describeQuota, usedPercent } from './quota.mjs';
@@ -100,7 +100,8 @@ const gitOk = (/** @type {string[]} */ args, cwd = ROOT) => spawnSync('git', arg
 function prepareWorktree(t) {
   const wt = join(STATE, 'wt', t.id);
   const branch = `swarm/${t.id}`;
-  if (existsSync(wt)) git(['worktree', 'remove', '--force', wt]);
+  // .swarm/wt is ours: if a previous run left a half-made or unregistered directory, clear it.
+  if (existsSync(wt) && !gitOk(['worktree', 'remove', '--force', wt])) rmSync(wt, { recursive: true, force: true });
   git(['worktree', 'prune']);
   git(['branch', '-f', branch, INTEGRATION]);
   git(['worktree', 'add', wt, branch]);
@@ -354,6 +355,8 @@ async function cmdRun(/** @type {string[]} */ argv) {
         row.started = Date.now();
         row.last = 'preparing worktree';
         const p = (async () => {
+          // Yield first: a synchronous throw below would otherwise reach `finally` before `p` exists.
+          await null;
           try {
             prepareWorktree(t);
             const code = await runCodex(t, row, { model, effort, runDir });
