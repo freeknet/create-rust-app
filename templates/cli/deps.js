@@ -1,12 +1,12 @@
 // @ts-check
 /**
  * Crates the cli templates need beyond the base set in src/gen/deps.js.
- * @param {any} ctx @returns {import('../../src/gen/deps.js').Dep[]}
+ * @param {import('../../src/types.ts').Ctx} ctx @returns {import('../../src/types.ts').Dep[]}
  */
 export default (ctx) => {
   const f = ctx.flags;
   const config = f.has('serde') && f.has('config');
-  /** @type {import('../../src/gen/deps.js').Dep[]} */
+  /** @type {import('../../src/types.ts').Dep[]} */
   const deps = [];
   // db.rs finds its data directory with `dirs`; base deps only add it for config.
   if (f.has('sqlite') && !config) deps.push({ name: 'dirs', version: '7' });

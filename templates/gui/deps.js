@@ -3,12 +3,12 @@
  * Crates the GUI app shell needs. egui is a direct dependency in both runtimes so app code
  * names `egui::` rather than `eframe::egui::` (see CONTRACTS.md, "GUI runtime seam").
  *
- * @param {any} ctx
- * @returns {import('../../src/gen/deps.js').Dep[]}
+ * @param {import('../../src/types.ts').Ctx} ctx
+ * @returns {import('../../src/types.ts').Dep[]}
  */
 export default (ctx) => {
   const f = ctx.flags;
-  /** @type {import('../../src/gen/deps.js').Dep[]} */
+  /** @type {import('../../src/types.ts').Dep[]} */
   const deps = [{ name: 'egui', version: '0.37' }];
   if (f.has('gui_eframe')) {
     // x11 + wayland give winit a windowing backend on Linux (CI lints and tests there too);

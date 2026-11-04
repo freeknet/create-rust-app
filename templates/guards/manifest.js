@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @param {any} ctx
+ * @param {import('../../src/types.ts').Ctx} ctx
  * @param {{ src: string, dest: string }[]} files
  */
 export default function (ctx, files) {

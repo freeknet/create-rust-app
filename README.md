@@ -9,7 +9,7 @@
 releases, and a house style that checks itself.**
 
 [![CI](https://github.com/freeknet/create-rust-app/actions/workflows/ci.yml/badge.svg)](https://github.com/freeknet/create-rust-app/actions/workflows/ci.yml)
-![node](https://img.shields.io/badge/node-%3E%3D20-5fd08a)
+![node](https://img.shields.io/badge/node-%3E%3D22.18-5fd08a)
 ![typescript](https://img.shields.io/badge/typescript-strict-7cf7ff)
 ![rust](https://img.shields.io/badge/rust-1.99.1-ff9f6e)
 ![license](https://img.shields.io/badge/license-MIT-8a5cff)
@@ -40,7 +40,7 @@ cargo test
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-Needs Node 20+. Rust is optional at scaffold time; when `cargo` is on `PATH` the new project gets a
+Needs Node 22.18+. Rust is optional at scaffold time; when `cargo` is on `PATH` the new project gets a
 `cargo check --all-targets` before you see the summary, and you get a `rustup toolchain install`
 hint if the pinned channel is missing.
 
@@ -57,7 +57,7 @@ hint if the pinned channel is missing.
 
 With no preset you get the defaults: a single-crate eframe GUI, edition 2024, MSRV 1.98,
 toolchain pinned to 1.99.1, every tooling option on. Presets are just partial answers layered on
-those defaults (see [`src/presets.js`](src/presets.js)); any flag below overrides them.
+those defaults (see [`src/presets.ts`](src/presets.ts)); any flag below overrides them.
 
 ## Flags
 
