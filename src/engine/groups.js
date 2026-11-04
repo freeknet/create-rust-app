@@ -20,6 +20,6 @@ export const GROUPS = [
   { id: 'gui', when: (c) => c.hasGui, mount: appMount },
   { id: 'gui-glow', when: (c) => c.flags.has('gui_winit_glow'), mount: appMount },
   { id: 'gui-features', when: (c) => c.hasGui, mount: appMount },
-  { id: 'guards', when: (c) => c.flags.has('headerCheck') || c.flags.has('unsafeCheck') || c.flags.has('toolchainPin'), mount: appMount },
+  { id: 'guards', when: (c) => ['headerCheck', 'unsafeCheck', 'toolchainPin', 'changelogGen'].some((k) => c.flags.has(k)), mount: appMount },
   { id: 'workspace', when: (c) => c.workspace },
 ];
