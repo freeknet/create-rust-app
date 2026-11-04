@@ -3,7 +3,7 @@
 
 /** @typedef {import('./deps.js').Dep} Dep */
 
-export const LINTS_RUST = `warnings = "deny"
+export const LINTS_RUST_BASE = `warnings = "deny"
 dead_code = "deny"
 non_snake_case = "deny"
 non_upper_case_globals = "deny"
@@ -131,7 +131,7 @@ export function singleManifest(ctx, deps) {
 ${docs}
 ${depTables(appDeps, inlineSpec)}
 [lints.rust]
-${LINTS_RUST}
+${lintsRust(ctx)}
 
 [lints.clippy]
 ${LINTS_CLIPPY}
@@ -173,7 +173,7 @@ ${repoUrl(ctx) ? `repository = ${q(repoUrl(ctx))}\n` : ''}publish = false
 ${wsDeps}
 
 [workspace.lints.rust]
-${LINTS_RUST}
+${lintsRust(ctx)}
 
 [workspace.lints.clippy]
 ${LINTS_CLIPPY}
@@ -203,4 +203,15 @@ workspace = true
     { dest: `crates/${ctx.appCrate}/Cargo.toml`, content: member(ctx.appCrate, ctx.tagline || ctx.name, deps.filter((d) => (d.crate ?? 'app') === 'app')) },
     { dest: 'crates/xtask/Cargo.toml', content: member('xtask', `Project automation for ${ctx.name}: \`cargo xtask <task>\`.`, deps.filter((d) => d.crate === 'xtask')) },
   ];
+}
+
+/**
+ * The house lint block. One deliberate exception: tracing's event macros expand to
+ * `#[allow(unused_imports)]`, which `forbid` turns into a hard error (E0453), so projects that log
+ * with tracing get `deny` instead: same strictness for our code, and the macros still compile.
+ * @param {{ flags: Set<string> }} ctx
+ */
+export function lintsRust(ctx) {
+  if (!ctx.flags.has('log_tracing')) return LINTS_RUST_BASE;
+  return LINTS_RUST_BASE.replace('unused_imports = "forbid"', 'unused_imports = "deny"  # forbid breaks tracing's macros (E0453)');
 }

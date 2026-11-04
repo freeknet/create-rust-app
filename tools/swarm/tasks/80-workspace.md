@@ -1,5 +1,7 @@
 ---
 title: Workspace layout (strobe-style) + xtask
+model: gpt-6.1-sol
+effort: medium
 owns: [templates/workspace/**]
 depends: [gui-glow]
 gate: node scripts/scaffold-check.mjs strobe && node scripts/scaffold-check.mjs strobe --out .scratch/ws-eframe --set guiStack=eframe

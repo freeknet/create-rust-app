@@ -1,5 +1,7 @@
 ---
 title: The tool's own README, CI and e2e test
+model: gpt-6-luna
+effort: medium
 owns: [README.md, LICENSE, CHANGELOG.md, .github/**, test/e2e.test.js]
 depends: []
 gate: npm test

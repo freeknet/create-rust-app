@@ -1,5 +1,7 @@
 ---
 title: Base project files + .github templates
+model: gpt-6-luna
+effort: medium
 owns: [templates/base/**, templates/github/**]
 depends: []
 gate: node scripts/scaffold-check.mjs cli --gate none && node scripts/scaffold-check.mjs strobe --gate none && node scripts/scaffold-check.mjs lib --gate none && node scripts/scaffold-check.mjs minimal --gate none && node scripts/scaffold-check.mjs rustaman --gate none

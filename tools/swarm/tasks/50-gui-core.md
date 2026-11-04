@@ -1,5 +1,7 @@
 ---
 title: GUI app templates (eframe stack, rustaman-style)
+model: gpt-6.1-sol
+effort: high
 owns: [templates/gui/**, templates/gui-features/**]
 depends: []
 gate: node scripts/scaffold-check.mjs rustaman && node scripts/scaffold-check.mjs rustaman --out .scratch/gui-all --set features.tray=true --set features.singleInstance=true --set features.commandPalette=true --set edition=2024 && node scripts/scaffold-check.mjs rustaman --out .scratch/gui-bare --set features.themes=false --set features.brand=false --set features.motion=false --set features.icons=false --set features.config=false --set features.winres=false

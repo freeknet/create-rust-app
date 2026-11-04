@@ -1,5 +1,7 @@
 ---
 title: winit + glutin + egui_glow runtime (strobe-style)
+model: gpt-6.1-sol
+effort: high
 owns: [templates/gui-glow/**]
 depends: [gui-core]
 gate: node scripts/scaffold-check.mjs rustaman --out .scratch/glow-single --set guiStack=winit-glow

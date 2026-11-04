@@ -26,12 +26,12 @@ export function baseDeps(ctx) {
   if (c.logging === 'log') d.push({ name: 'log', version: '0.4' });
   if (c.logging === 'env_logger') d.push({ name: 'log', version: '0.4' }, { name: 'env_logger', version: '0.11' });
   if (c.logging === 'tracing') d.push({ name: 'tracing', version: '0.1' }, { name: 'tracing-subscriber', version: '0.3', features: ['env-filter'] });
-  if (c.serde) d.push({ name: 'serde', version: '1', features: ['derive'] }, { name: 'toml', version: '1.1' });
+  if (c.serde) d.push({ name: 'serde', version: '1', features: ['derive'] }, { name: 'toml', version: '1.2' });
   if (c.serde && f.has('config')) d.push({ name: 'dirs', version: '7' });
   if (c.async === 'tokio') d.push({ name: 'tokio', version: '1', features: ['rt-multi-thread', 'macros'] });
   if (c.http === 'ureq') d.push({ name: 'ureq', version: '3', defaultFeatures: false, features: ['rustls'] });
-  if (c.http === 'reqwest') d.push({ name: 'reqwest', version: '0.12', defaultFeatures: false, features: ['rustls-tls', 'json'] });
-  if (c.sqlite) d.push({ name: 'rusqlite', version: '0.37', features: ['bundled'] });
+  if (c.http === 'reqwest') d.push({ name: 'reqwest', version: '0.13', defaultFeatures: false, features: ['rustls', 'json'] });
+  if (c.sqlite) d.push({ name: 'rusqlite', version: '0.41', features: ['bundled'] });
   return d;
 }
 

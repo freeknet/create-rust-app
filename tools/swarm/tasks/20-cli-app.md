@@ -1,5 +1,7 @@
 ---
 title: CLI entry, args, prompts, post-steps
+model: gpt-6.1-sol
+effort: medium
 owns: [bin/**, src/cli.js, src/args.js, src/prompts.js, src/post/**, test/cli.test.js, test/args.test.js]
 depends: []
 gate: npm test

@@ -61,6 +61,8 @@ export function buildContext(a) {
     for (const f of ['themes', 'brand', 'motion', 'icons', 'winres', 'tray', 'singleInstance',
       'commandPalette', 'screenshotExample', 'unsafeCheck']) flags.delete(f);
   }
+  // A library has no user config file of its own; that belongs to the app embedding it.
+  if (a.kind === 'lib') flags.delete('config');
 
   const appCrate = workspace ? `${a.name}-app` : a.name;
   const year = String(new Date().getFullYear());
