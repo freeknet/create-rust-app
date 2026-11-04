@@ -154,6 +154,11 @@ ${t.body}
 
 const SCHEMA = join(ROOT, 'tools', 'swarm', 'report.schema.json');
 
+/** The worker's structured final report, if it wrote one. @param {string} file */
+function readReport(file) {
+  try { return JSON.parse(readFileSync(file, 'utf8')); } catch { return null; }
+}
+
 // ─── run ───────────────────────────────────────────────────────────────────
 /**
  * @typedef {{ id: string, title: string, state: 'waiting'|'running'|'gating'|'merged'|'failed'|'skipped',
@@ -176,6 +181,11 @@ function runCodex(t, row, o) {
       '-c', 'sandbox_workspace_write.network_access=true',
       '-c', `model_reasoning_effort="${t.effort ?? o.effort}"`,
       '--add-dir', join(home, '.cargo'), '--add-dir', join(home, '.rustup'));
+    // Windows: the elevated sandbox needs a one-time provisioning step that can break (codex doctor:
+    // "elevated Windows sandbox provisioning recorded a structured failure"), after which every shell
+    // call fails with "setup refresh had errors". The unelevated backend needs no provisioning;
+    // its network isolation is weaker, which doesn't matter here (workers get network anyway).
+    if (process.platform === 'win32') args.push('-c', `windows.sandbox="${process.env.SWARM_WINDOWS_SANDBOX ?? 'unelevated'}"`);
     if (!o.resume) args.push('--output-schema', SCHEMA);
     args.push('-m', t.model ?? o.model);
     args.push('-');
@@ -348,6 +358,8 @@ async function cmdRun(/** @type {string[]} */ argv) {
             prepareWorktree(t);
             const code = await runCodex(t, row, { model, effort, runDir });
             if (code !== 0) throw new Error(row.limited ? `usage limit hit — partial work kept in .swarm/wt/${t.id}; resume with: swarm retry ${t.id} "continue"` : `codex exited ${code}`);
+            const report = readReport(join(runDir, `${t.id}.last.md`));
+            if (report?.status === 'blocked') throw new Error(`worker blocked: ${report.summary}`);
             for (let attempt = 0; ; attempt++) {
               try {
                 await finish(t, row);
