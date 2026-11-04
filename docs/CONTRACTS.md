@@ -127,7 +127,8 @@ Cargo target auto-discovery is relied on: `src/lib.rs`, `src/main.rs`, `src/bin/
 ## Crate shape every kind follows
 
 - Every kind ships `src/lib.rs` (the binary kinds also `src/main.rs`, a thin shell over the lib).
-- `lib.rs` must contain these hooks verbatim so the guards group can plug in:
+- `lib.rs` must contain these hooks verbatim, as the LAST items in the file with no other `mod`
+  adjacent (rustfmt reorders runs of adjacent `mod` lines, which breaks `cargo fmt --check`):
 
   ```rust
   // @if headerCheck
