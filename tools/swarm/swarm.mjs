@@ -14,6 +14,8 @@
  * Task files: tools/swarm/tasks/<id>.md with frontmatter
  *   ---
  *   title: Short title
+ *   model: gpt-6.1-sol                             # optional (default: workhorse tier)
+ *   effort: medium                                 # optional: low|medium|high|xhigh
  *   owns: [templates/gui/**, test/gui.test.js]    # globs the worker may change
  *   depends: [engine]                              # wait for these; branch from integration
  *   gate: node scripts/scaffold-check.mjs rustaman # run by the orchestrator after the worker
@@ -55,7 +57,7 @@ const SPIN = '⣾⣽⣻⢿⡿⣟⣯⣷';
 
 // ─── tasks ─────────────────────────────────────────────────────────────────
 /**
- * @typedef {{ id: string, title: string, owns: string[], depends: string[], gate?: string, body: string }} Task
+ * @typedef {{ id: string, title: string, owns: string[], depends: string[], gate?: string, model?: string, effort?: string, body: string }} Task
  * @returns {Task[]}
  */
 function loadTasks() {
@@ -72,7 +74,7 @@ function loadTasks() {
       const v = kv[2].trim();
       fm[kv[1]] = v.startsWith('[') ? v.slice(1, -1).split(',').map((s) => s.trim()).filter(Boolean) : v;
     }
-    return { id: f.replace(/^\d+-/, '').replace(/\.md$/, ''), title: fm.title ?? f, owns: fm.owns ?? [], depends: fm.depends ?? [], gate: fm.gate, body: m[2].trim() };
+    return { id: f.replace(/^\d+-/, '').replace(/\.md$/, ''), title: fm.title ?? f, owns: fm.owns ?? [], depends: fm.depends ?? [], gate: fm.gate, model: fm.model, effort: fm.effort, body: m[2].trim() };
   });
 }
 
@@ -155,10 +157,10 @@ function runCodex(t, row, o) {
     args.push('-C', wt, '-s', 'workspace-write', '--json',
       '-o', join(o.runDir, `${t.id}.last.md`),
       '-c', 'sandbox_workspace_write.network_access=true',
-      '-c', `model_reasoning_effort="${o.effort}"`,
+      '-c', `model_reasoning_effort="${t.effort ?? o.effort}"`,
       '--add-dir', join(home, '.cargo'), '--add-dir', join(home, '.rustup'),
       '--add-dir', join(ROOT, '.git'));
-    if (o.model) args.push('-m', o.model);
+    args.push('-m', t.model ?? o.model);
     args.push('-');
     const log = createWriteStream(join(o.runDir, `${t.id}.jsonl`), { flags: 'a' });
     const child = spawn('codex', args, { cwd: wt, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -257,15 +259,17 @@ function render(rows, frame) {
 async function cmdRun(/** @type {string[]} */ argv) {
   const ids = argv.filter((a, i) => !a.startsWith('-') && !['-j', '--model', '--effort', '--base'].includes(argv[i - 1]));
   const opt = (/** @type {string} */ f, /** @type {string} */ d) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : d; };
-  const jobs = Number(opt('-j', '4'));
-  const effort = opt('--effort', 'high');
-  const model = opt('--model', '');
+  const jobs = Number(opt('-j', '3'));
+  // Defaults are the workhorse tier, not the frontier model in ~/.codex/config.toml:
+  // parallel workers multiply cost, so tasks opt up per-task via `model:` / `effort:` frontmatter.
+  const effort = opt('--effort', 'medium');
+  const model = opt('--model', 'gpt-6.1-sol');
   const base = opt('--base', 'main');
   let tasks = loadTasks();
   if (ids.length) tasks = tasks.filter((t) => ids.includes(t.id));
   if (!tasks.length) { console.error('no tasks'); process.exit(2); }
   if (argv.includes('--dry')) {
-    for (const t of tasks) console.log(`${t.id.padEnd(14)} deps=[${t.depends}] owns=[${t.owns}] gate=${t.gate ?? '-'}`);
+    for (const t of tasks) console.log(`${t.id.padEnd(14)} ${t.model ?? model}/${t.effort ?? effort} deps=[${t.depends}] owns=[${t.owns}] gate=${t.gate ?? '-'}`);
     return;
   }
   if (git(['status', '--porcelain', '--untracked-files=no'])) console.warn(dim('note: uncommitted changes in the main checkout are not visible to workers'));
@@ -356,7 +360,7 @@ async function cmdRetry(/** @type {string} */ id, /** @type {string} */ feedback
   if (!existsSync(join(STATE, 'wt', id))) throw new Error(`worktree for ${id} is gone; rerun it instead`);
   const opt = (/** @type {string} */ f, /** @type {string} */ d) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : d; };
   Object.assign(row, { state: 'running', started: Date.now(), ended: undefined, error: undefined });
-  const code = await runCodex(t, row, { effort: opt('--effort', 'high'), model: opt('--model', ''), runDir: join(STATE, 'runs', state.run), resume: { thread: row.thread, feedback } });
+  const code = await runCodex(t, row, { effort: opt('--effort', 'medium'), model: opt('--model', 'gpt-6.1-sol'), runDir: join(STATE, 'runs', state.run), resume: { thread: row.thread, feedback } });
   try {
     if (code !== 0) throw new Error(`codex exited ${code}`);
     await finish(t, row);

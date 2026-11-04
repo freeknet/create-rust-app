@@ -1,5 +1,7 @@
 ---
 title: Rust templates for cli, tui and lib kinds
+model: gpt-6.1-sol
+effort: high
 owns: [templates/cli/**, templates/tui/**, templates/lib/**]
 depends: []
 gate: node scripts/scaffold-check.mjs cli && node scripts/scaffold-check.mjs tui && node scripts/scaffold-check.mjs lib && node scripts/scaffold-check.mjs minimal && node scripts/scaffold-check.mjs cli --out .scratch/cli-max --set crates.async=tokio --set crates.http=reqwest --set crates.sqlite=true --set crates.logging=tracing

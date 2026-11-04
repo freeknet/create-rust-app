@@ -1,5 +1,7 @@
 ---
 title: Convention guards (header, unsafe boundary, toolchain pin)
+model: gpt-6.1-sol
+effort: medium
 owns: [templates/guards/**]
 depends: [cli-tui-lib]
 gate: node scripts/scaffold-check.mjs cli && node scripts/scaffold-check.mjs lib && node scripts/scaffold-check.mjs tui
