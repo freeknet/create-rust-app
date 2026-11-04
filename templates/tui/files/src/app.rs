@@ -208,7 +208,8 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use super::{Action, App, Item, action_for};
+    use super::action_for;
+    use super::{Action, App, Item};
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
     /// A three-row list, first row selected.

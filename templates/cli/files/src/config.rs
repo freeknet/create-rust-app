@@ -138,7 +138,8 @@ fn write_durably(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Config, parse, save_to};
+    use super::Config;
+    use super::{parse, save_to};
 
     #[test]
     fn an_empty_or_broken_file_yields_the_defaults() -> anyhow::Result<()> {
