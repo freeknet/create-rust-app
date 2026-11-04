@@ -4,20 +4,22 @@
   "description": "Scaffold Rust projects (CLI, GUI, TUI, library, workspace) with strict lints, CI, release automation and a house style — in a very colourful terminal.",
   "type": "module",
   "bin": {
-    "create-rust-app": "./bin/create-rust-app.js"
+    "create-rust-app": "./dist/bin/create-rust-app.js"
   },
   "files": [
-    "bin",
-    "src",
+    "dist",
     "templates"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.18.0"
   },
   "scripts": {
-    "test": "node --test test/",
-    "check": "node scripts/scaffold-check.mjs",
-    "swarm": "node tools/swarm/swarm.mjs"
+    "build": "tsc -p .",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "check": "node scripts/scaffold-check.ts",
+    "swarm": "node tools/swarm/swarm.ts"
   },
   "keywords": [
     "rust",
@@ -38,5 +40,9 @@
   "dependencies": {
     "@clack/prompts": "^0.11.0",
     "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^6.0.3"
   }
 }
