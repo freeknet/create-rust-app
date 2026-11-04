@@ -3,7 +3,7 @@
 // Description:  Writes the mark's derived files: the multi-size .ico that
 //               build.rs embeds in the executable.
 //
-// Dependencies: @@crate@@::brand (the geometry and the rasteriser); std only
+// Dependencies: @@appCrateSnake@@::brand (the geometry and the rasteriser); std only
 // ============================================================================
 
 //! `cargo run --example brand_assets`
@@ -27,7 +27,7 @@ fn main() -> anyhow::Result<()> {
         .join("@@name@@.ico");
     let images: Vec<(u32, Vec<u8>)> = SIZES
         .iter()
-        .map(|&edge| (edge, @@crate@@::brand::rasterise(edge)))
+        .map(|&edge| (edge, @@appCrateSnake@@::brand::rasterise(edge)))
         .collect();
     std::fs::write(&out, ico(&images)?)?;
     println!("wrote {}", out.display());

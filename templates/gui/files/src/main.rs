@@ -3,7 +3,7 @@
 // Description:  Entry point: parses the command line, loads preferences, and
 //               hands off to the desktop front end.
 //
-// Dependencies: anyhow; @@crate@@::{cli, gui}
+// Dependencies: anyhow; @@appCrateSnake@@::{cli, gui}
 // ============================================================================
 
 // No console window behind the GUI in a release build: Windows gives a
@@ -23,7 +23,7 @@
 //! nowhere and a startup failure would look like the program refusing to
 //! open. See [`report`].
 
-use @@crate@@::cli::Cli;
+use @@appCrateSnake@@::cli::Cli;
 
 fn main() -> std::process::ExitCode {
     // @if clap
@@ -33,8 +33,8 @@ fn main() -> std::process::ExitCode {
     };
     // @else
     let cli = match Cli::parse_from(std::env::args().skip(1)) {
-        Ok(@@crate@@::cli::Parsed::Run(cli)) => cli,
-        Ok(@@crate@@::cli::Parsed::Print(text)) => {
+        Ok(@@appCrateSnake@@::cli::Parsed::Run(cli)) => cli,
+        Ok(@@appCrateSnake@@::cli::Parsed::Print(text)) => {
             println!("{text}");
             return std::process::ExitCode::SUCCESS;
         }
@@ -49,10 +49,10 @@ fn main() -> std::process::ExitCode {
     // A second launch hands focus to the first window and leaves, rather
     // than opening a second copy that fights the first over the config file.
     #[cfg(windows)]
-    let _instance = match @@crate@@::win::single_instance::acquire(@@crate@@::APP_ID) {
+    let _instance = match @@appCrateSnake@@::win::single_instance::acquire(@@appCrateSnake@@::APP_ID) {
         Some(guard) => guard,
         None => {
-            @@crate@@::win::single_instance::focus_existing(@@crate@@::NAME);
+            @@appCrateSnake@@::win::single_instance::focus_existing(@@appCrateSnake@@::NAME);
             return std::process::ExitCode::SUCCESS;
         }
     };
@@ -71,9 +71,9 @@ fn main() -> std::process::ExitCode {
 fn run(cli: Cli) -> anyhow::Result<()> {
     // @if config
     let mut config = if cli.reset {
-        @@crate@@::config::Config::default()
+        @@appCrateSnake@@::config::Config::default()
     } else {
-        @@crate@@::config::load()
+        @@appCrateSnake@@::config::load()
     };
     // @if themes
     if let Some(theme) = cli.theme {
@@ -83,10 +83,10 @@ fn run(cli: Cli) -> anyhow::Result<()> {
     if let Some(font) = cli.font {
         config.font = Some(font);
     }
-    @@crate@@::gui::run::run(config)
+    @@appCrateSnake@@::gui::run::run(config)
     // @else
     let Cli {} = cli;
-    @@crate@@::gui::run::run()
+    @@appCrateSnake@@::gui::run::run()
     // @end
 }
 
@@ -97,5 +97,5 @@ fn run(cli: Cli) -> anyhow::Result<()> {
 fn report(message: &str) {
     eprintln!("{message}");
     #[cfg(windows)]
-    @@crate@@::win::dialog::show_error(message, @@crate@@::NAME);
+    @@appCrateSnake@@::win::dialog::show_error(message, @@appCrateSnake@@::NAME);
 }

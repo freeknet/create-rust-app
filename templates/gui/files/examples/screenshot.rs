@@ -4,7 +4,7 @@
 //               README and for reviewing a visual change.
 //
 // Dependencies: egui_kittest (headless harness + wgpu renderer), anyhow;
-//               @@crate@@::gui::app
+//               @@appCrateSnake@@::gui::app
 // ============================================================================
 
 //! `cargo run --example screenshot [-- <out dir>]`
@@ -15,7 +15,7 @@
 //! on demand, and a directory of stale committed PNGs is what makes someone
 //! trust a picture that is three changes out of date.
 
-use @@crate@@::gui::app::{Action, App, Page};
+use @@appCrateSnake@@::gui::app::{Action, App, Page};
 
 fn main() -> anyhow::Result<()> {
     let out = std::env::args().nth(1).map_or_else(
@@ -27,7 +27,7 @@ fn main() -> anyhow::Result<()> {
         std::path::PathBuf::from,
     );
     std::fs::create_dir_all(&out)?;
-    let [width, height] = @@crate@@::gui::DEFAULT_SIZE;
+    let [width, height] = @@appCrateSnake@@::gui::DEFAULT_SIZE;
     for page in Page::ALL {
         let mut harness = egui_kittest::Harness::builder()
             .with_size(egui::vec2(width, height))
@@ -35,7 +35,7 @@ fn main() -> anyhow::Result<()> {
                 |ui, app: &mut Option<App>| {
                     let app = app.get_or_insert_with(|| {
                         // @if config
-                        let mut app = App::new(ui.ctx(), @@crate@@::config::Config::default());
+                        let mut app = App::new(ui.ctx(), @@appCrateSnake@@::config::Config::default());
                         // @else
                         let mut app = App::new(ui.ctx());
                         // @end
