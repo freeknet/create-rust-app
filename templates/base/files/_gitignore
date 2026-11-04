@@ -1,0 +1,14 @@
+/target
+/dist
+/scratch
+*.log
+# Local editor state and agent worktrees are never part of the project.
+/.idea
+/.vscode
+/.claude/worktrees
+.DS_Store
+Thumbs.db
+# Credentials stay out of version control; a documented example may be committed.
+.env
+.env.*
+!.env.example
