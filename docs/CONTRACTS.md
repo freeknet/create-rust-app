@@ -64,7 +64,7 @@ test/*.test.js             node --test
 
 ### Tokens (`@@x@@`)
 
-`name crate Name NAME appCrate displayName tagline author github email year license edition msrv
+`name crate Name NAME appCrate appCrateSnake displayName tagline author github email year license edition msrv
 toolchain accent module`. `@@module@@` is computed per file by `moduleFor(dest, ctx)`.
 Unknown tokens throw (so a typo fails tests loudly).
 
@@ -98,3 +98,83 @@ Unknown tokens throw (so a typo fails tests loudly).
 - Generated projects must pass `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`
   under the lint block in PLAN.md 1.3, and `cargo test`.
 - No `unwrap/expect/panic/todo` in non-test code; tests return `anyhow::Result<()>`.
+
+## Dependencies (`templates/<group>/deps.js`)
+
+Templates never edit Cargo.toml. A group that needs crates ships `templates/<group>/deps.js`:
+
+```js
+// @ts-check
+/** @param {any} ctx @returns {import('../../src/gen/deps.js').Dep[]} */
+export default (ctx) => [
+  { name: 'eframe', version: '0.37', defaultFeatures: false, features: ['wgpu', 'default_fonts'] },
+  { name: 'windows-sys', version: '0.61', target: 'cfg(windows)', features: ['Win32_Foundation'] },
+  { name: 'winresource', version: '0.1', kind: 'build' },
+  { name: 'egui_kittest', version: '0.37', kind: 'dev', features: ['wgpu', 'snapshot'] },
+  { name: 'resvg', version: '0.49', crate: 'xtask' },     // workspace: goes to crates/xtask
+];
+```
+
+`kind`: normal (default) / dev / build. `crate`: `app` (default — the single crate, or `crates/<name>-app`)
+or `xtask`. Same dep from several groups → features are unioned. Base deps from the `crates` answers
+(anyhow, thiserror, clap+derive, log/env_logger/tracing, serde+derive & toml, dirs (serde & config),
+tokio, ureq/reqwest, rusqlite) are added by `src/gen/deps.js` — don't redeclare them unless you need
+extra features. Unused deps are harmless; missing ones fail the build.
+
+Cargo target auto-discovery is relied on: `src/lib.rs`, `src/main.rs`, `src/bin/*.rs`, `build.rs`,
+`examples/*.rs`, `tests/*.rs` need no manifest entries.
+
+## Crate shape every kind follows
+
+- Every kind ships `src/lib.rs` (the binary kinds also `src/main.rs`, a thin shell over the lib).
+- `lib.rs` must contain these hooks verbatim so the guards group can plug in:
+
+  ```rust
+  // @if headerCheck
+  #[cfg(test)]
+  mod header_check;
+  // @end
+  // @if unsafeCheck
+  #[cfg(test)]
+  mod unsafe_check;
+  // @end
+  ```
+- Guards (`templates/guards`): `src/header_check.rs` walks `src/`, `tests/`, `examples/` of the crate
+  it is in (`env!("CARGO_MANIFEST_DIR")`), expected module names exactly as `src/gen/header.js`
+  computes them, crate name from `env!("CARGO_PKG_NAME")`, workspace prefix = crate name snake-cased
+  when the crate dir is under `crates/`. `tests/toolchain_pin.rs` finds `rust-toolchain.toml` at the
+  crate root or `../../` (workspace).
+
+## GUI runtime seam (`templates/gui` ↔ `templates/gui-glow`)
+
+- `src/gui/mod.rs` declares `pub mod app; pub mod run; pub mod ui; …`.
+- `src/gui/app/mod.rs`: `pub struct App` with `pub fn new(ctx: &egui::Context, config: crate::config::Config) -> Self`
+  (config only when `config` flag) and `pub fn ui(&mut self, ctx: &egui::Context)` that draws one frame.
+  App code uses `egui` only — never eframe or winit types — so both runtimes can drive it.
+- `src/gui/run.rs`: `pub fn run(config: crate::config::Config) -> anyhow::Result<()>` opens the window and
+  drives `App`. The `gui` group's version uses eframe (`@if gui_eframe`); `templates/gui-glow` replaces
+  this one file (same dest) with a winit + glutin + egui_glow loop modelled on strobe. Anything else the
+  glow loop needs lives in `src/gui/glow/` (owned by gui-glow).
+- `egui` is a direct dependency in both stacks (`egui = "0.37"`) so app code names `egui::` not `eframe::egui::`.
+
+## UI API (`src/ui/*`, used by `src/cli.js`)
+
+```js
+// tty.js
+detect({ noColor?: boolean }) → { tier: 'truecolor'|'ansi256'|'ansi16'|'none', unicode: boolean,
+                                  tty: boolean, columns: number, animate: boolean }
+// rainbow.js  (all return plain text when caps.tier === 'none')
+paint(caps, text, { offset = 0, step = 9 } = {}) → string     // per-char hue sweep
+hex(caps, '#ff6ec7', text) → string;  dim(caps, text);  bold(caps, text)
+// banner.js
+bannerFrame(caps, frame) → string[]            // the two Prism lines for one frame
+showBanner(caps) → Promise<void>               // animates when caps.animate, else prints once
+// theme.js
+STOPS: string[]  // ['#ff6ec7','#7cf7ff','#b6ff6e','#ffd36e','#8a5cff','#ff9f6e']
+bullet(caps, i) → string                       // '◆' in STOPS[i % 6]
+section(caps, i, title) → string               // tinted section title for prompt groups
+// spinner.js
+createSpinner(caps) → { start(msg), message(msg), stop(msg, ok = true) }
+// summary.js
+renderSummary(caps, ctx, dests: string[], { dir, cargoChecked?: boolean|null, git?: boolean }) → string
+```

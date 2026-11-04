@@ -18,6 +18,7 @@ export const GROUPS = [
   { id: 'tui', when: (c) => c.kind === 'tui' },
   { id: 'lib', when: (c) => c.kind === 'lib' },
   { id: 'gui', when: (c) => c.hasGui, mount: appMount },
+  { id: 'gui-glow', when: (c) => c.flags.has('gui_winit_glow'), mount: appMount },
   { id: 'gui-features', when: (c) => c.hasGui, mount: appMount },
   { id: 'guards', when: (c) => c.flags.has('headerCheck') || c.flags.has('unsafeCheck') || c.flags.has('toolchainPin'), mount: appMount },
   { id: 'workspace', when: (c) => c.workspace },
