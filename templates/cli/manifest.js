@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * Drops the optional modules whose crates were not selected.
- * @param {any} ctx @param {{ src: string, dest: string }[]} files
+ * @param {import('../../src/types.ts').Ctx} ctx @param {{ src: string, dest: string }[]} files
  */
 export default function (ctx, files) {
   const f = ctx.flags;

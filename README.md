@@ -12,7 +12,7 @@ C R E A T E - R U S T - A P P
 <sub>In a truecolor terminal every letter takes its own hue and the rule sweeps through the spectrum for about a second, then settles.</sub>
 
 [![CI](https://github.com/lnorton89/create-rust-app/actions/workflows/ci.yml/badge.svg)](https://github.com/lnorton89/create-rust-app/actions/workflows/ci.yml)
-![node](https://img.shields.io/badge/node-%3E%3D20-5fd08a)
+![node](https://img.shields.io/badge/node-%3E%3D22.18-5fd08a)
 ![rust](https://img.shields.io/badge/rust-1.99.1-ff7a18)
 ![license](https://img.shields.io/badge/license-MIT-7b5bff)
 
@@ -40,7 +40,7 @@ cargo test
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-Needs Node 20+. Rust is optional at scaffold time; when `cargo` is on `PATH` the new project gets a
+Needs Node 22.18+. Rust is optional at scaffold time; when `cargo` is on `PATH` the new project gets a
 `cargo check --all-targets` before you see the summary, and you get a `rustup toolchain install`
 hint if the pinned channel is missing.
 
@@ -57,7 +57,7 @@ hint if the pinned channel is missing.
 
 With no preset you get the defaults: a single-crate eframe GUI, edition 2024, MSRV 1.98,
 toolchain pinned to 1.99.1, every tooling option on. Presets are just partial answers layered on
-those defaults (see [`src/presets.js`](src/presets.js)); any flag below overrides them.
+those defaults (see [`src/presets.ts`](src/presets.ts)); any flag below overrides them.
 
 ## Flags
 
@@ -178,7 +178,7 @@ pub const NAME: &str = "@@displayName@@";
 - `@if` / `@elif` / `@else` / `@end` lines after any comment leader are evaluated against the
   context flags and removed.
 - `_gitignore` becomes `.gitignore`, `.tmpl` is stripped, binaries are copied raw.
-- Cargo.toml and deny.toml are composed in JavaScript (`src/gen/`), and groups declare crates
+- Cargo.toml and deny.toml are composed in TypeScript (`src/gen/`), and groups declare crates
   through `templates/<group>/deps.js` instead of editing Cargo.toml.
 
 The full rules (Ctx shape, flags, tokens, manifests, the GUI runtime seam) are in
@@ -188,13 +188,13 @@ The full rules (Ctx shape, flags, tokens, manifests, the GUI runtime seam) are i
 
 ```bash
 npm ci
-npm test                                          # node --test test/
+npm run typecheck && npm test && npm run build
 node scripts/scaffold-check.mjs <preset>          # scaffold + fmt + clippy -D warnings + test
 node scripts/scaffold-check.mjs <preset> --gate check   # cargo check only, faster
 node scripts/scaffold-check.mjs cli --set crates.async=tokio --set crates.http=reqwest
 ```
 
-Plain ESM JavaScript with `// @ts-check` and JSDoc, no build step, and only two runtime
+Strict TypeScript compiled to ESM JavaScript for distribution, with only two runtime
 dependencies (`@clack/prompts`, `picocolors`). Every preset must come out passing
 `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings` and `cargo test`.
 Commits use conventional prefixes (`feat:`, `fix:`, `docs:`, `test:`, `build:`, `ci:` …), and

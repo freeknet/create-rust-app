@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22, 26]
+        node: [22, 26]
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,7 +33,14 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
+      - run: npm run typecheck
       - run: npm test
+      - run: npm run build
+      - name: Check package contents
+        shell: bash
+        run: |
+          npm pack --dry-run --json > pack.json
+          node -e "const f = require('./pack.json')[0].files.map(x => x.path); if (!f.includes('dist/bin/create-rust-app.js') || f.some(x => x.endsWith('.ts'))) process.exit(1)"
 
   scaffold:
     name: Scaffold ${{ matrix.preset }} / ${{ matrix.os }}
