@@ -3,27 +3,30 @@
 Every module codes against these. If you need to change one, say so in your final message —
 do not silently change it.
 
+The shared TypeScript shapes are declared in `src/types.ts`; the prose below specifies
+the runtime behavior and template conventions.
+
 ## Layout
 
 ```
-bin/create-rust-app.js     entry; imports src/cli.js and calls main(process.argv.slice(2))
-src/cli.js                 main(argv): args → answers → ctx → plan → write → post → summary
-src/args.js                parseArgv(argv) → { dir, flags }           (node:util parseArgs)
-src/presets.js             PRESETS: Record<id, Partial<Answers>>; DEFAULTS: Answers
-src/prompts.js             ask(partial, ui) → Answers                  (@clack/prompts)
-src/context.js             buildContext(answers) → Ctx                 (CORE, exists)
-src/engine/directives.js   applyDirectives(text, flags) → text         (CORE, exists)
-src/engine/render.js       renderText(text, ctx, dest) → text          (CORE, exists)
-src/engine/groups.js       GROUPS: [{ id, when(ctx) }]                 (CORE, exists)
-src/engine/plan.js         buildPlan(ctx) → Promise<PlanEntry[]>       (CORE, exists)
-src/engine/write.js        writePlan(plan, targetDir, {force, dryRun}) (CORE, exists)
-src/gen/header.js          moduleFor(dest, ctx) → string               (CORE, exists)
-src/gen/index.js           generate(ctx) → PlanEntry[]                 (Cargo.toml, deny.toml …)
-src/gen/cargo.js, deps.js, deny.js
-src/post/{git,cargo,open}.js
-src/ui/{tty,rainbow,banner,theme,spinner,summary}.js
+bin/create-rust-app.ts     entry; imports src/cli.ts and calls main(process.argv.slice(2))
+src/cli.ts                 main(argv): args → answers → ctx → plan → write → post → summary
+src/args.ts                parseArgv(argv) → { dir, flags }           (node:util parseArgs)
+src/presets.ts             PRESETS: Record<id, Partial<Answers>>; DEFAULTS: Answers
+src/prompts.ts             ask(partial, ui) → Answers                  (@clack/prompts)
+src/context.ts             buildContext(answers) → Ctx                 (CORE, exists)
+src/engine/directives.ts   applyDirectives(text, flags) → text         (CORE, exists)
+src/engine/render.ts       renderText(text, ctx, dest) → text          (CORE, exists)
+src/engine/groups.ts       GROUPS: [{ id, when(ctx) }]                 (CORE, exists)
+src/engine/plan.ts         buildPlan(ctx) → Promise<PlanEntry[]>       (CORE, exists)
+src/engine/write.ts        writePlan(plan, targetDir, {force, dryRun}) (CORE, exists)
+src/gen/header.ts          moduleFor(dest, ctx) → string               (CORE, exists)
+src/gen/index.ts           generate(ctx) → PlanEntry[]                 (Cargo.toml, deny.toml …)
+src/gen/cargo.ts, deps.ts, deny.ts
+src/post/{git,cargo,open}.ts
+src/ui/{tty,rainbow,banner,theme,spinner,summary}.ts
 templates/<group>/files/** template files; templates/<group>/manifest.js optional
-test/*.test.js             node --test
+test/*.test.ts             node --test
 ```
 
 ## Answers (user choices; what presets and prompts produce)
@@ -70,7 +73,7 @@ Unknown tokens throw (so a typo fails tests loudly).
 
 ## Templates
 
-- A group is a folder `templates/<id>/` with a `files/` tree. `src/engine/groups.js` lists the
+- A group is a folder `templates/<id>/` with a `files/` tree. `src/engine/groups.ts` lists the
   groups and when each applies. Dest path = path under `files/`, with:
   - `@@token@@` substituted in path segments,
   - a leading `_` on a segment's name turned into `.` (`_gitignore` → `.gitignore`, `_github` → `.github`),
@@ -105,7 +108,7 @@ Templates never edit Cargo.toml. A group that needs crates ships `templates/<gro
 
 ```js
 // @ts-check
-/** @param {any} ctx @returns {import('../../src/gen/deps.js').Dep[]} */
+/** @param {import('../../src/types.ts').Ctx} ctx @returns {import('../../src/gen/deps.ts').Dep[]} */
 export default (ctx) => [
   { name: 'eframe', version: '0.37', defaultFeatures: false, features: ['wgpu', 'default_fonts'] },
   { name: 'windows-sys', version: '0.61', target: 'cfg(windows)', features: ['Win32_Foundation'] },
@@ -118,7 +121,7 @@ export default (ctx) => [
 `kind`: normal (default) / dev / build. `crate`: `app` (default — the single crate, or `crates/<name>-app`)
 or `xtask`. Same dep from several groups → features are unioned. Base deps from the `crates` answers
 (anyhow, thiserror, clap+derive, log/env_logger/tracing, serde+derive & toml, dirs (serde & config),
-tokio, ureq/reqwest, rusqlite) are added by `src/gen/deps.js` — don't redeclare them unless you need
+tokio, ureq/reqwest, rusqlite) are added by `src/gen/deps.ts` — don't redeclare them unless you need
 extra features. Unused deps are harmless; missing ones fail the build.
 
 Cargo target auto-discovery is relied on: `src/lib.rs`, `src/main.rs`, `src/bin/*.rs`, `build.rs`,
@@ -141,7 +144,7 @@ Cargo target auto-discovery is relied on: `src/lib.rs`, `src/main.rs`, `src/bin/
   // @end
   ```
 - Guards (`templates/guards`): `src/header_check.rs` walks `src/`, `tests/`, `examples/` of the crate
-  it is in (`env!("CARGO_MANIFEST_DIR")`), expected module names exactly as `src/gen/header.js`
+  it is in (`env!("CARGO_MANIFEST_DIR")`), expected module names exactly as `src/gen/header.ts`
   computes them, crate name from `env!("CARGO_PKG_NAME")`, workspace prefix = crate name snake-cased
   when the crate dir is under `crates/`. `tests/toolchain_pin.rs` finds `rust-toolchain.toml` at the
   crate root or `../../` (workspace).
@@ -158,25 +161,25 @@ Cargo target auto-discovery is relied on: `src/lib.rs`, `src/main.rs`, `src/bin/
   glow loop needs lives in `src/gui/glow/` (owned by gui-glow).
 - `egui` is a direct dependency in both stacks (`egui = "0.37"`) so app code names `egui::` not `eframe::egui::`.
 
-## UI API (`src/ui/*`, used by `src/cli.js`)
+## UI API (`src/ui/*`, used by `src/cli.ts`)
 
 ```js
-// tty.js
+// tty.ts
 detect({ noColor?: boolean }) → { tier: 'truecolor'|'ansi256'|'ansi16'|'none', unicode: boolean,
                                   tty: boolean, columns: number, animate: boolean }
-// rainbow.js  (all return plain text when caps.tier === 'none')
+// rainbow.ts  (all return plain text when caps.tier === 'none')
 paint(caps, text, { offset = 0, step = 9 } = {}) → string     // per-char hue sweep
 hex(caps, '#ff6ec7', text) → string;  dim(caps, text);  bold(caps, text)
-// banner.js
+// banner.ts
 bannerFrame(caps, frame) → string[]            // the two Prism lines for one frame
 showBanner(caps) → Promise<void>               // animates when caps.animate, else prints once
-// theme.js
+// theme.ts
 STOPS: string[]  // ['#ff6ec7','#7cf7ff','#b6ff6e','#ffd36e','#8a5cff','#ff9f6e']
 bullet(caps, i) → string                       // '◆' in STOPS[i % 6]
 section(caps, i, title) → string               // tinted section title for prompt groups
-// spinner.js
+// spinner.ts
 createSpinner(caps) → { start(msg), message(msg), stop(msg, ok = true) }
-// summary.js
+// summary.ts
 renderSummary(caps, ctx, dests: string[], { dir, cargoChecked?: boolean|null, git?: boolean }) → string
 ```
 
