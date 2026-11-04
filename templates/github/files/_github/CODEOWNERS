@@ -1,0 +1,8 @@
+# Code owners for pull-request review requests.
+#
+# The default owner is the maintainer, for everything. If a path ever needs
+# a different reviewer, add a more specific pattern *below* this one:
+# GitHub applies the last matching pattern in the file, so the catch-all
+# stays first and the exceptions follow it. A pattern and its owners share
+# one line; on two lines the owner is read as a second pattern.
+* @@@github@@
