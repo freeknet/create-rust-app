@@ -2,7 +2,7 @@
 title: Convert the tool to strict TypeScript
 model: gpt-6.1-terra
 effort: medium
-owns: [src/**, bin/**, test/**, scripts/**, tools/swarm/swarm.*, package.json, package-lock.json, tsconfig.json, tsconfig.*.json, docs/CONTRACTS.md, AGENTS.md, README.md, .github/workflows/ci.yml, templates/*/manifest.js, templates/*/deps.js, .gitignore]
+owns: [src/**, bin/**, test/**, scripts/**, tools/swarm/*, package.json, package-lock.json, tsconfig.json, tsconfig.*.json, docs/CONTRACTS.md, AGENTS.md, README.md, .github/workflows/ci.yml, templates/*/manifest.js, templates/*/deps.js, .gitignore]
 depends: []
 gate: npm run typecheck && npm test && npm run build && node dist/bin/create-rust-app.js --help && node scripts/scaffold-check.mjs cli --gate none && node scripts/scaffold-check.mjs rustaman --gate none && node scripts/scaffold-check.mjs strobe --gate none
 ---
