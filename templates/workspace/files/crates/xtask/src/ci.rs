@@ -8,7 +8,8 @@
 //! Check formatting, lint every target, run tests, and audit dependencies.
 //! Install cargo-deny with `cargo install cargo-deny --locked` when enabled.
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::bail;
+use anyhow::{Context as _, Result};
 use std::process::Command;
 
 pub(crate) fn run() -> Result<()> {

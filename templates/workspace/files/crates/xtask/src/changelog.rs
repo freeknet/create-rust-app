@@ -10,7 +10,8 @@
 //! `--check` compares released entries only: Unreleased changes on every commit.
 //! Regeneration replaces the file, so release prose belongs in release notes.
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::bail;
+use anyhow::{Context as _, Result};
 use std::process::Command;
 
 const HEADINGS: &[&str] = &[

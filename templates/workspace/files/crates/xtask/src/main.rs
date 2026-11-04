@@ -13,7 +13,8 @@
 mod changelog;
 mod ci;
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::bail;
+use anyhow::{Context as _, Result};
 use std::path::PathBuf;
 use std::process::ExitCode;
 

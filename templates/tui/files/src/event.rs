@@ -62,11 +62,19 @@ impl Events {
             let event = crossterm::event::read()?;
             // Windows reports both press and release; acting on both would
             // move the selection twice per key.
+            // @if edition_2024
             if let crossterm::event::Event::Key(key) = event
                 && key.kind == KeyEventKind::Press
             {
                 return Ok(Event::Key(key));
             }
+            // @else
+            if let crossterm::event::Event::Key(key) = event {
+                if key.kind == KeyEventKind::Press {
+                    return Ok(Event::Key(key));
+                }
+            }
+            // @end
             if let crossterm::event::Event::Resize(_, _) = event {
                 return Ok(Event::Resize);
             }

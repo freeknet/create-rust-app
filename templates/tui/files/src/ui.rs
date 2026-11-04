@@ -17,7 +17,6 @@
 //! hue along the wheel at fixed saturation and lightness, so the gradient
 //! stays readable on both dark and light terminals.
 
-use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -38,7 +37,7 @@ const HUE_STEP: f32 = 12.0;
 const HUE_DRIFT: f32 = 4.0;
 
 /// Draws the whole frame.
-pub fn draw(frame: &mut Frame<'_>, app: &App) {
+pub fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
     let [title, body, status] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Min(0),
@@ -72,7 +71,7 @@ pub fn title_bar(ticks: u64) -> Line<'static> {
 }
 
 /// The list of items, with the selection highlighted in the accent.
-fn draw_list(frame: &mut Frame<'_>, app: &App, area: Rect) {
+fn draw_list(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect) {
     let accent = accent();
     let items: Vec<ListItem<'_>> = app
         .items()
