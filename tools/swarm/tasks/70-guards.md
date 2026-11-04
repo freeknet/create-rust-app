@@ -16,5 +16,8 @@ workflows at the repo root's `.github/workflows`.
   only under `src/win/` and `src/gui/run/`; `tests/toolchain_pin.rs` only with `toolchainPin`, skipping
   workflows without a `toolchain:` key and skipping cleanly when `.github` is absent. Drop files via
   manifest.js.
+- Also own the single-crate changelog generator: `examples/changelog.rs` (port rustaman's; regenerates
+  CHANGELOG.md from conventional commits via `git log`), only with `changelogGen & single` (workspaces
+  use `cargo xtask changelog`). Drop it via manifest.js otherwise.
 - Your gate scaffolds include the cli/tui/lib templates (merged before you start): the header check must
   pass on them. If a template header is wrong, report it; don't edit other groups.
