@@ -179,3 +179,14 @@ createSpinner(caps) → { start(msg), message(msg), stop(msg, ok = true) }
 // summary.js
 renderSummary(caps, ctx, dests: string[], { dir, cargoChecked?: boolean|null, git?: boolean }) → string
 ```
+
+## rustfmt-safe templates (learned the hard way)
+
+Generated code must pass `cargo fmt --check` on editions 2021 and 2024 under every flag combination.
+
+- Don't put directive-gated `use` or `#[derive(..)]` lines next to ungated ones: rustfmt reorders imports
+  and merges derives across what were directive lines. Give gated imports their own `use` block.
+- Avoid brace imports mixing case classes (`{Icon, GRID}`) and adjacent `use` lines whose order differs
+  between style editions; avoid `use @@crate@@::…` next to other `use`s.
+- No nested `if` inside `if let` (2024 clippy wants a let-chain, which doesn't compile on 2021).
+- Guard hook blocks go last in lib.rs (see "Crate shape").
