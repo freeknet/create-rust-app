@@ -213,5 +213,5 @@ workspace = true
  */
 export function lintsRust(ctx) {
   if (!ctx.flags.has('log_tracing')) return LINTS_RUST_BASE;
-  return LINTS_RUST_BASE.replace('unused_imports = "forbid"', 'unused_imports = "deny"  # forbid breaks tracing's macros (E0453)');
+  return LINTS_RUST_BASE.replace('unused_imports = "forbid"', 'unused_imports = "deny"  # forbid breaks the tracing macros (E0453)');
 }
