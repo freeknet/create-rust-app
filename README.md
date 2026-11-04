@@ -1,20 +1,20 @@
 <div align="center">
 
-# create-rust-app
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/banner-dark.svg">
+  <img alt="create-rust-app — scaffold rust projects at the speed of light" src="assets/brand/banner-light.svg" width="900">
+</picture>
 
-**Scaffold Rust projects at the speed of light: strict lints, real CI, signed releases, and a house style that holds itself to account.**
+**Scaffold Rust projects (CLI, GUI, TUI, library or workspace) with strict lints, real CI, signed
+releases, and a house style that checks itself.**
 
-```text
-C R E A T E - R U S T - A P P
-◇ scaffold rust projects at the speed of light ━━━━━━━━━━━━━━━━━━━━
-```
-
-<sub>In a truecolor terminal every letter takes its own hue and the rule sweeps through the spectrum for about a second, then settles.</sub>
-
-[![CI](https://github.com/lnorton89/create-rust-app/actions/workflows/ci.yml/badge.svg)](https://github.com/lnorton89/create-rust-app/actions/workflows/ci.yml)
+[![CI](https://github.com/freeknet/create-rust-app/actions/workflows/ci.yml/badge.svg)](https://github.com/freeknet/create-rust-app/actions/workflows/ci.yml)
 ![node](https://img.shields.io/badge/node-%3E%3D20-5fd08a)
-![rust](https://img.shields.io/badge/rust-1.99.1-ff7a18)
-![license](https://img.shields.io/badge/license-MIT-7b5bff)
+![typescript](https://img.shields.io/badge/typescript-strict-7cf7ff)
+![rust](https://img.shields.io/badge/rust-1.99.1-ff9f6e)
+![license](https://img.shields.io/badge/license-MIT-8a5cff)
+
+<sub>In a truecolor terminal the banner animates: every letter takes its own hue and the rule sweeps the spectrum for about a second, then settles. <code>NO_COLOR</code>, pipes and CI get plain text.</sub>
 
 </div>
 
@@ -48,8 +48,8 @@ hint if the pinned channel is missing.
 
 | Preset | What you get | Kind | Edition | Licence |
 |---|---|---|---|---|
-| `rustaman` | single-crate Windows GUI · eframe + wgpu, winres icon/manifest, screenshot example | `gui` | 2021 | MIT |
-| `strobe` | cargo workspace desktop app · winit + egui_glow · xtask + conventions crate | `workspace` | 2024 | MIT + Commons Clause |
+| `rustaman` | single-crate desktop GUI (Windows-first, builds on Linux) · eframe + wgpu · winres icon/manifest · screenshot example | `gui` | 2021 | MIT |
+| `strobe` | cargo workspace desktop app · winit + glutin + egui_glow · `cargo xtask ci` / `changelog` | `workspace` | 2024 | MIT + Commons Clause |
 | `cli` | clap + anyhow + env_logger, full tooling | `cli` | 2024 | MIT |
 | `tui` | ratatui + crossterm terminal app | `tui` | 2024 | MIT |
 | `lib` | publishable crate · thiserror · docs.rs ready, no binary | `lib` | 2024 | MIT OR Apache-2.0 |
@@ -113,6 +113,10 @@ Every project carries the same lint block (single crates in `[lints]`, workspace
 | `unsafe_op_in_unsafe_fn` | deny | `undocumented_unsafe_blocks` | deny |
 | `non_snake_case` & friends | deny | `missing_safety_doc` | deny |
 
+One deliberate exception: projects that log with `tracing` get `unused_imports = "deny"` instead of
+`forbid`, because tracing's event macros expand to `#[allow(unused_imports)]`, which `forbid` turns
+into a hard error (E0453).
+
 Exceptions are written `#[expect(lint, reason = "…")]`, never `#[allow]`. Tests return
 `anyhow::Result<()>` and every `assert!` carries a message. Release profile: LTO, one codegen
 unit, `panic = "abort"`, plus a `release-fast` profile for quick optimised builds.
@@ -133,13 +137,14 @@ Every `.rs` file opens with the same banner, and the `Module:` line is derived f
 ```
 
 `src/lib.rs` → `my_app (library crate root)`, `src/main.rs` → `my_app (binary crate root)`,
-`tests/x.rs` → `x (integration test)`, workspace crates get their crate as prefix
-(`my_app_app::cli`). A generated `src/header_check.rs` test walks the crate and fails the build
+`tests/x.rs` → `x (integration test)`, and workspace crates get their crate as a prefix
+(`crates/neon-app/src/cli.rs` → `neon_app::cli`). A generated `src/header_check.rs` test walks the crate and fails the build
 when a banner drifts.
 
 ### An `unsafe` boundary
 
-GUI projects keep FFI in `src/win/` only, one call per private safe function, a `// SAFETY:`
+GUI projects keep FFI in `src/win/` (and the GL loader in `src/gui/run/` for the winit + glow
+runtime) only, one call per private safe function, a `// SAFETY:`
 comment on each, and `Drop` types that own every handle. `src/unsafe_check.rs` enforces it.
 
 ### A pinned toolchain
@@ -188,26 +193,66 @@ The full rules (Ctx shape, flags, tokens, manifests, the GUI runtime seam) are i
 
 ```bash
 npm ci
-npm test                                          # node --test test/
+npm run typecheck                                 # tsc, strict
+npm test                                          # node --test, straight from the .ts sources
+npm run build                                     # dist/, what npm publishes
 node scripts/scaffold-check.mjs <preset>          # scaffold + fmt + clippy -D warnings + test
 node scripts/scaffold-check.mjs <preset> --gate check   # cargo check only, faster
 node scripts/scaffold-check.mjs cli --set crates.async=tokio --set crates.http=reqwest
 ```
 
-Plain ESM JavaScript with `// @ts-check` and JSDoc, no build step, and only two runtime
-dependencies (`@clack/prompts`, `picocolors`). Every preset must come out passing
-`cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings` and `cargo test`.
-Commits use conventional prefixes (`feat:`, `fix:`, `docs:`, `test:`, `build:`, `ci:` …), and
-notable changes go under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
+Strict TypeScript with only two runtime dependencies (`@clack/prompts`, `picocolors`). Node runs
+the `.ts` sources directly during development, but it won't strip types inside `node_modules`,
+which is where `npx` runs from, so the package ships compiled JS from `dist/`. Shared shapes
+(`Answers`, `Ctx`, `Dep`, `PlanEntry`) live in `src/types.ts`.
+
+Every preset must come out passing `cargo fmt --check`,
+`cargo clippy --all-targets --all-features -- -D warnings` and `cargo test`. Commits use
+conventional prefixes (`feat:`, `fix:`, `docs:`, `test:`, `build:`, `ci:` …), and notable changes
+go under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
+
+## Branding
+
+<img src="assets/brand/mark.svg" width="72" align="right" alt="">
+
+Everything in [`assets/brand/`](assets/brand) is generated by `node scripts/brand.mjs` from the same
+hue math as the terminal banner, so the README, the social card and the CLI always agree:
+
+| File | Use |
+|---|---|
+| `banner-dark.svg` / `banner-light.svg` | README header (`<picture>` picks by colour scheme) |
+| `mark.svg` / `mark-transparent.svg` | the prism mark: six facets in the prompt-bullet colours and a `>` |
+| `social-preview.svg` / `.png` | 1280×640 card for *Settings → Social preview* on GitHub |
+
+Palette: prompt stops `#ff6ec7` `#ff9f6e` `#ffd36e` `#b6ff6e` `#7cf7ff` `#8a5cff` on `#0c0b12`.
+Wordmark hue runs 140° → 266° (green → cyan → violet), with each letter 9° on from the last.
 
 ## How this repo is built
 
 The work is split into tasks in [`tools/swarm/tasks/`](tools/swarm/tasks), each owning a
-disjoint set of paths. `node tools/swarm/swarm.mjs run` fans them out to parallel Codex workers,
-one git worktree and branch per task. The orchestrator checks each diff stays inside the task's
-`owns` globs, runs its gate, commits, and merges into `swarm/integration` for a human to review.
-Workers code against [docs/CONTRACTS.md](docs/CONTRACTS.md), which is what keeps a dozen of them
-from stepping on each other.
+disjoint set of paths and declaring a gate command. `node tools/swarm/swarm.mjs run` fans them out to
+headless Codex workers, one git worktree and branch per task, and merges green work into
+`swarm/integration` for a human to review:
+
+- **Budget first.** Before launching, it reads the ChatGPT plan's usage windows through
+  `codex app-server` (`account/rateLimits/read`, which spends nothing). It refuses to start above
+  `--max-used` and stops launching workers while throttled. `swarm quota` prints the windows.
+- **Model per task.** The default is the workhorse tier (`gpt-6.1-sol`, medium effort). Tasks opt
+  into `gpt-6-luna` for docs, `gpt-6.1-terra` for mechanical work, or higher effort, through
+  frontmatter. Workers never inherit the frontier model from `~/.codex/config.toml`.
+- **Cache-friendly prompts.** Every worker gets the same preamble first, so the prompt cache serves
+  it to workers 2..N, and the task-specific part comes after.
+- **Trust, then verify.** Workers can't commit (`.git` is read-only to them). The orchestrator
+  checks that the diff stays inside the task's `owns` globs and runs the gate outside the sandbox.
+  If the gate fails, it resumes the worker's own thread, cheaply from cache, with the log tail, up
+  to `--repairs` times.
+- **Structured hand-back.** Each worker ends with a JSON report
+  (`tools/swarm/report.schema.json`): status, files, checks run, unfinished items, and proposed
+  contract changes.
+
+Workers code against [docs/CONTRACTS.md](docs/CONTRACTS.md), which is what keeps them from stepping
+on each other. `swarm prepare <id>` and `swarm finish <id>` let any other agent, or a person, work a
+task through the same ownership check, gate and merge.
 
 ## License
 
