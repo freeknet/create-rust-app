@@ -247,11 +247,12 @@ async function finish(t, row) {
     if (code !== 0) throw Object.assign(new Error(`gate failed (see .swarm/runs/${row.run}/${t.id}.gate.log)`), { gateLog: logFile });
   }
   git(['add', '-A', '--', ...changed], wt);
-  git(['-c', 'user.name=swarm', '-c', 'user.email=swarm@localhost', 'commit', '-qm', `feat(${t.id}): ${t.title}\n\nBuilt by a Codex worker via tools/swarm.`], wt);
+  // Commits use the repo owner's own git identity: workers are tools, not authors.
+  git(['commit', '-qm', `feat(${t.id}): ${t.title}`], wt);
   // Merge into integration from the main checkout's perspective without touching its working tree.
   const integWt = join(STATE, 'wt', '_integration');
   if (!existsSync(integWt)) git(['worktree', 'add', integWt, INTEGRATION]);
-  if (!gitOk(['-c', 'user.name=swarm', '-c', 'user.email=swarm@localhost', 'merge', '--no-ff', '-qm', `merge swarm/${t.id}`, `swarm/${t.id}`], integWt)) {
+  if (!gitOk(['merge', '--no-ff', '-qm', `merge swarm/${t.id}`, `swarm/${t.id}`], integWt)) {
     git(['merge', '--abort'], integWt);
     throw new Error('merge conflict into swarm/integration');
   }
@@ -440,9 +441,12 @@ function cmdPrepare(/** @type {string} */ id) {
   console.log(wt);
 }
 
-async function cmdFinish(/** @type {string} */ id) {
-  const t = loadTasks().find((x) => x.id === id);
-  if (!t) throw new Error(`no task ${id}`);
+async function cmdFinish(/** @type {string} */ id, /** @type {string[]} */ argv = []) {
+  const found = loadTasks().find((x) => x.id === id);
+  if (!found) throw new Error(`no task ${id}`);
+  // --gate "<cmd>" overrides the task's gate (e.g. when something it needs lands in a later task).
+  const gi = argv.indexOf('--gate');
+  const t = gi >= 0 ? { ...found, gate: argv[gi + 1] } : found;
   const run = `manual-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`;
   mkdirSync(join(STATE, 'runs', run), { recursive: true });
   /** @type {Row} */
@@ -456,7 +460,7 @@ try {
   if (cmd === 'run') await cmdRun(rest);
   else if (cmd === 'prepare') cmdPrepare(rest[0]);
   else if (cmd === 'quota') console.log(describeQuota(await readQuota()));
-  else if (cmd === 'finish') await cmdFinish(rest[0]);
+  else if (cmd === 'finish') await cmdFinish(rest[0], rest.slice(1));
   else if (cmd === 'status') cmdStatus();
   else if (cmd === 'log') cmdLog(rest[0]);
   else if (cmd === 'retry') await cmdRetry(rest[0], rest[1] ?? '', rest.slice(2));
