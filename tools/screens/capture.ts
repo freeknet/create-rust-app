@@ -19,8 +19,9 @@ const { Terminal } = xtermHeadless;
 const { SerializeAddon } = serializeAddon;
 
 const ROOT = resolve(import.meta.dirname, '..', '..');
-const COLS = 96;
+let COLS = 96;
 const ROWS = 44;
+const EXTRA_ENV: Record<string, string> = {};
 
 type Step = { wait?: string | number; keys?: string; shot?: string };
 
@@ -38,7 +39,40 @@ const SCENARIOS: Record<string, { args: (dir: string) => string[]; steps: Step[]
   },
   cancel: {
     args: (dir) => [join(dir, 'demo-cancel')],
-    steps: [{ wait: 1600 }, { keys: KEY.ctrlC, wait: 800, shot: '01-cancel' }],
+    steps: [{ wait: 1600 }, { keys: KEY.down, wait: 300 }, { keys: KEY.ctrlC, wait: 800, shot: '01-cancel' }],
+  },
+  // No dir argument: the name prompt, then pick "Command-line tool".
+  name: {
+    args: () => [],
+    steps: [
+      { wait: 1600, shot: '01-name' },
+      { keys: 'neon-dash', wait: 300, shot: '02-typed' },
+      { keys: KEY.enter, wait: 600, shot: '03-preset' },
+      { keys: KEY.down + KEY.down, wait: 300, shot: '04-cli-highlighted' },
+      { keys: KEY.enter, wait: 700, shot: '05-review' },
+      { keys: KEY.down + KEY.down, wait: 300 },
+      { keys: KEY.enter, wait: 600, shot: '06-cancelled' },
+    ],
+  },
+  // Review → Customize → App → runtime → features (toggle tray) → back to review → create.
+  customize: {
+    args: (dir) => [join(dir, 'demo-custom')],
+    steps: [
+      { wait: 1600 },
+      { keys: KEY.enter, wait: 700 },
+      { keys: KEY.down, wait: 300 },
+      { keys: KEY.enter, wait: 600, shot: '01-menu' },
+      { keys: KEY.down, wait: 300 },
+      { keys: KEY.enter, wait: 600, shot: '02-runtime' },
+      { keys: KEY.enter, wait: 600, shot: '03-features' },
+      { keys: KEY.down.repeat(6), wait: 300 },
+      { keys: KEY.space, wait: 300, shot: '04-tray-on' },
+      { keys: KEY.enter, wait: 700, shot: '05-review-again' },
+      { keys: KEY.down, wait: 300 },
+      { keys: KEY.enter, wait: 600 },
+      { keys: KEY.down.repeat(2), wait: 300 },
+      { keys: KEY.enter, wait: 600, shot: '06-tooling' },
+    ],
   },
 };
 
@@ -54,14 +88,14 @@ function edge(): string | null {
 function page(body: string): string {
   return `<!doctype html><meta charset="utf-8"><style>
   html,body{margin:0;background:#0c0b12}
-  .term{padding:18px 22px;font:15px/1.35 'Cascadia Mono','Cascadia Code',Consolas,monospace;color:#d6d3e2;white-space:pre}
+  .term{padding:18px 22px;font:15px/1.2 'Cascadia Mono','Cascadia Code',Consolas,monospace;color:#d6d3e2;white-space:pre}
   .term pre{margin:0;font:inherit}
   /* serializeAsHTML wraps everything in a div with a white background and black default fg */
   .term pre>div{background-color:transparent!important;color:#d6d3e2!important}
   </style><div class="term">${body}</div>`;
 }
 
-async function run(name: string, outDir: string): Promise<string[]> {
+async function run(name: string, outDir: string, tag = ''): Promise<string[]> {
   const sc = SCENARIOS[name];
   if (!sc) throw new Error(`unknown scenario ${name}; try: ${Object.keys(SCENARIOS).join(', ')}`);
   const work = mkdtempSync(join(tmpdir(), 'cra-screens-'));
@@ -72,7 +106,7 @@ async function run(name: string, outDir: string): Promise<string[]> {
   if (!existsSync(entry)) throw new Error('build first: npm run build');
   const proc = pty.spawn(process.execPath, [entry, ...sc.args(work)], {
     name: 'xterm-256color', cols: COLS, rows: ROWS, cwd: work,
-    env: { ...process.env, COLORTERM: 'truecolor', WT_SESSION: 'screens', FORCE_COLOR: '3', CI: '' } as Record<string, string>,
+    env: { ...process.env, COLORTERM: 'truecolor', WT_SESSION: 'screens', FORCE_COLOR: '3', CI: '', ...EXTRA_ENV } as Record<string, string>,
   });
   let text = '';
   proc.onData((d) => { term.write(d); text += d; });
@@ -97,7 +131,7 @@ async function run(name: string, outDir: string): Promise<string[]> {
     const plain = Array.from({ length: term.buffer.active.length }, (_, i) => term.buffer.active.getLine(i)?.translateToString(true) ?? '').join('\n');
     if (plain === last) continue; // nothing changed: skip duplicate frames
     last = plain;
-    const file = join(outDir, `${name}-${step.shot}`);
+    const file = join(outDir, `${name}${tag}-${step.shot}`);
     writeFileSync(`${file}.html`, page(html));
     writeFileSync(`${file}.txt`, plain);
     shots.push(file);
@@ -109,11 +143,15 @@ async function run(name: string, outDir: string): Promise<string[]> {
 }
 
 const args = process.argv.slice(2);
+const colsIdx = args.indexOf('--cols');
+if (colsIdx >= 0) COLS = Number(args[colsIdx + 1]);
+for (let i = 0; i < args.length; i++) if (args[i] === '--env') { const [k, v] = (args[i + 1] ?? '').split('='); if (k) EXTRA_ENV[k] = v ?? ''; }
 const name = args[0] ?? 'defaults';
 const outIdx = args.indexOf('--out');
 const outDir = resolve(ROOT, outIdx >= 0 ? (args[outIdx + 1] ?? '') : '.scratch/screens');
 mkdirSync(outDir, { recursive: true });
-const shots = await run(name, outDir);
+const tagIdx = args.indexOf('--tag');
+const shots = await run(name, outDir, tagIdx >= 0 ? `-${args[tagIdx + 1]}` : '');
 const browser = edge();
 for (const f of shots) {
   if (!browser) break;

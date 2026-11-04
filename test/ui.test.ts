@@ -4,10 +4,13 @@ import assert from 'node:assert/strict';
 import { stripVTControlCharacters } from 'node:util';
 import { width } from '../src/ui/tty.ts';
 import { paint, hex, dim, bold } from '../src/ui/rainbow.ts';
-import { bannerFrame, showBanner } from '../src/ui/banner.ts';
+import { BLOCK_WIDTH, bannerFrame, showBanner } from '../src/ui/banner.ts';
 import { STOPS, bullet, section } from '../src/ui/theme.ts';
 import { createSpinner } from '../src/ui/spinner.ts';
-import { renderSummary } from '../src/ui/summary.ts';
+import { reviewLines } from '../src/prompts.ts';
+import { nextCommands } from '../src/cli.ts';
+import { reproduceCommand } from '../src/reproduce.ts';
+import { parseArgv } from '../src/args.ts';
 import { buildContext } from '../src/context.ts';
 import { resolveAnswers } from '../src/presets.ts';
 
@@ -46,7 +49,7 @@ test('none tier output has no escape codes', () => {
   const out = [
     paint(c, 'hello world'), hex(c, '#ff6ec7', 'x'), dim(c, 'd'), bold(c, 'b'),
     ...bannerFrame(c, 5), bullet(c, 2), section(c, 3, 'Crates'),
-    renderSummary(c, ctx, dests, { dir: 'demo-app', cargoChecked: true, git: true }),
+    reviewLines(c, ctx).title, reviewLines(c, ctx).body,
   ].join('\n');
   assert.ok(!out.includes('\x1b'));
   assert.deepEqual(bannerFrame(c, 0), ['CREATE-RUST-APP', 'scaffold rust projects at the speed of light']);
@@ -72,11 +75,18 @@ test('banner frames animate in truecolor', () => {
   const c = caps();
   const f0 = bannerFrame(c, 0);
   const f10 = bannerFrame(c, 10);
-  assert.equal(f0.length, 2);
-  assert.ok(f0[0] !== undefined && f0[1] !== undefined);
-  assert.notDeepEqual(f0, f10);
-  assert.equal(stripVTControlCharacters(f0[0]), 'C R E A T E - R U S T - A P P');
-  assert.equal(stripVTControlCharacters(f0[1]), `◇ scaffold rust projects at the speed of light ${'━'.repeat(20)}`);
+  // Three block-letter rows + the tagline/rule line.
+  assert.equal(f0.length, 4, 'block wordmark is 3 rows + tagline');
+  assert.notDeepEqual(f0, f10, 'frames differ (the hue drifts)');
+  const plain = f0.map((l) => stripVTControlCharacters(l));
+  assert.ok(plain.slice(0, 3).every((l) => /[▀▄█]/.test(l)), 'rows are block glyphs');
+  assert.ok(plain.slice(0, 3).every((l) => l.length <= BLOCK_WIDTH), 'rows fit the declared width');
+  assert.ok(plain[3]?.startsWith('◇ scaffold rust projects at the speed of light ━'), 'tagline then rule');
+  assert.equal(plain[3]?.length, BLOCK_WIDTH, 'rule ends at the wordmark edge');
+
+  // Too narrow for block letters → one bold line.
+  const narrow = bannerFrame(caps({ columns: 40 }), 0).map((l) => stripVTControlCharacters(l));
+  assert.equal(narrow[0], 'CREATE-RUST-APP', 'narrow terminals get a single-line wordmark');
 });
 
 test('showBanner animates, restores the cursor and ends with a blank line', async () => {
@@ -85,41 +95,62 @@ test('showBanner animates, restores the cursor and ends with a blank line', asyn
   await showBanner(caps({ animate: true }), { out: sink, frames: 3, interval: 1 });
   assert.ok(out.startsWith('\x1b[?25l'));
   assert.ok(out.endsWith('\n\n\x1b[?25h'));
-  assert.equal(out.split('\x1b[2A').length - 1, 2);
+  assert.equal(out.split('\x1b[4A').length - 1, 2, 'each later frame rewrites the 4 banner lines in place');
 
   out = '';
   await showBanner(caps({ tier: 'none' }), { out: sink });
   assert.equal(out, 'CREATE-RUST-APP\nscaffold rust projects at the speed of light\n\n');
 });
 
-test('summary contains the name and every top-level dir', () => {
-  for (const tier of /** @type {const} */ (['truecolor', 'none'] as const)) {
-    const out = stripVTControlCharacters(renderSummary(caps({ tier }), ctx, dests, { dir: 'demo-app', cargoChecked: true, git: true }));
-    assert.ok(out.includes('demo-app'));
-    for (const dir of topDirs) assert.ok(out.includes(`${dir}/`), `missing ${dir}/`);
-    assert.ok(out.includes('cd demo-app'));
-    assert.ok(out.includes('cargo run'));
-    assert.ok(out.includes('cargo clippy --all-targets --all-features -- -D warnings'));
-    assert.ok(out.includes('more'));
+test('review names the project and every section, in human words', () => {
+  for (const tier of (['truecolor', 'none'] as const)) {
+    const { title, body } = reviewLines(caps({ tier }), ctx);
+    const text = stripVTControlCharacters(`${title}
+${body}`);
+    assert.ok(text.includes('demo-app') && text.includes('desktop app'), 'title names project + kind');
+    for (const s of ['crates', 'app', 'guardrails', 'github', 'docs', 'then']) assert.ok(text.includes(s), `missing ${s}`);
+    for (const raw of ['singleInstance', 'toolchainPin', 'cargoDeny', 'changelogGen', 'issueTemplates', 'agentDocs']) {
+      assert.ok(!text.includes(raw), `raw key ${raw} leaked into the review`);
+    }
   }
-  const lib = stripVTControlCharacters(renderSummary(caps(), { ...ctx, kind: 'lib' }, ['Cargo.toml', 'src/lib.rs'], { dir: '.' }));
-  assert.ok(lib.includes('cargo test'));
-  assert.ok(!lib.includes('cargo run'));
-  assert.ok(!lib.includes('cd .'));
+  const lib = stripVTControlCharacters(reviewLines(caps(), { ...ctx, kind: 'lib' }).body);
+  assert.ok(!/^app /m.test(lib), 'no app section for a library');
 });
 
-test('summary never exceeds the terminal width', () => {
-  for (const columns of [24, 40, 60, 80, 120]) {
-    for (const unicode of [true, false]) {
-      const out = renderSummary(caps({ columns, unicode }), ctx, dests, { dir: 'some/rather/long/path/to/demo-app', cargoChecked: false, git: true });
-      for (const line of out.split('\n')) {
-        assert.ok(width(line) <= Math.min(columns, 80), `${columns}: "${stripVTControlCharacters(line)}"`);
-      }
-    }
+test('review never exceeds the terminal width', () => {
+  for (const columns of [60, 80, 120]) {
+    const { body } = reviewLines(caps({ columns }), ctx);
+    for (const line of body.split('\n')) assert.ok(width(line) <= columns, `${columns}: "${stripVTControlCharacters(line)}"`);
   }
   for (const columns of [20, 40, 80]) {
     for (const line of bannerFrame(caps({ columns }), 3)) assert.ok(width(line) <= columns);
   }
+});
+
+test('next commands fit the kind', () => {
+  const flat = (k: typeof ctx.kind, dir = 'demo') => nextCommands({ ...ctx, kind: k }, dir).map(([c]) => c);
+  assert.deepEqual(flat('lib', '.'), ['cargo test', 'cargo clippy --all-targets -- -D warnings'], 'lib: test, no cd into "."');
+  assert.ok(flat('gui').includes('cargo run') && flat('gui')[0] === 'cd demo');
+  assert.ok(flat('workspace').includes('cargo xtask ci'), 'workspace uses xtask');
+});
+
+test('the reproduce command round-trips through the argument parser', () => {
+  const custom = resolveAnswers('cli', { name: 'neon-dash' });
+  custom.crates.async = 'tokio';
+  custom.crates.sqlite = true;
+  custom.tooling.release = false;
+  custom.edition = '2021';
+  custom.post.git = false;
+  const cmd = reproduceCommand(custom);
+  assert.ok(cmd.startsWith('npx create-rust-app neon-dash --preset cli'), cmd);
+  const argv = cmd.replace(/^npx create-rust-app /, '').split(' ');
+  const { overrides } = parseArgv(argv);
+  const back = resolveAnswers(overrides.preset ?? null, overrides);
+  assert.deepEqual(back.crates, custom.crates, 'crates survive the round trip');
+  assert.deepEqual(back.tooling, custom.tooling, 'tooling survives the round trip');
+  assert.equal(back.edition, '2021');
+  assert.equal(back.post.git, false);
+  assert.equal(reproduceCommand(resolveAnswers('cli', { name: 'x' })), 'npx create-rust-app x --preset cli -y', 'defaults stay one short line');
 });
 
 test('ASCII fallback has no non-ASCII when unicode=false', () => {
@@ -133,7 +164,7 @@ test('ASCII fallback has no non-ASCII when unicode=false', () => {
     sp.stop('failed', false);
     const out = [
       ...bannerFrame(c, 7), bullet(c, 1), section(c, 4, 'Tooling ◆'), spun,
-      renderSummary(c, { ...ctx, name: 'démo' }, dests, { dir: 'démo app', cargoChecked: true, git: true }),
+      reviewLines(c, { ...ctx, name: 'demo' }).body,
     ].join('\n');
     assert.ok(/^[\x00-\x7f]*$/.test(out), stripVTControlCharacters(out).replace(/[\x00-\x7f]/g, ''));
   }

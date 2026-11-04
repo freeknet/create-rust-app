@@ -28,7 +28,7 @@ export interface Answers {
     toolchainPin: boolean; agentDocs: boolean; headerCheck: boolean; unsafeCheck: boolean;
     changelogGen: boolean; issueTemplates: boolean; codeowners: boolean; securityMd: boolean;
   };
-  post: { git: boolean; cargoCheck: boolean; open: 'none' | 'code' | 'cursor' };
+  post: { git: boolean; fetch: boolean; cargoCheck: boolean; open: 'none' | 'code' | 'cursor' };
   preset: string | null;
 }
 

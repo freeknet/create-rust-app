@@ -10,7 +10,7 @@ for (const name of ['name', 'preset', 'kind', 'gui', 'edition', 'msrv', 'toolcha
   OPTIONS[name] = { type: 'string' };
 }
 for (const name of ['with', 'without', 'set']) OPTIONS[name] = { type: 'string', multiple: true };
-for (const name of ['yes', 'no-git', 'no-cargo-check', 'dry-run', 'json', 'no-color', 'quiet', 'force', 'help', 'version']) {
+for (const name of ['yes', 'no-git', 'no-fetch', 'cargo-check', 'no-cargo-check', 'dry-run', 'json', 'no-color', 'quiet', 'force', 'help', 'version']) {
   OPTIONS[name] = { type: 'boolean' };
 }
 OPTIONS.yes = { type: 'boolean', short: 'y' };
@@ -138,6 +138,8 @@ export function parseArgv(argv: string[]) {
       setAnswer(overrides, text.slice(0, eq), raw === 'true' ? true : raw === 'false' ? false : raw);
     } else if (name === 'no-git') setAnswer(overrides, 'post.git', false);
     else if (name === 'no-cargo-check') setAnswer(overrides, 'post.cargoCheck', false);
+    else if (name === 'cargo-check') setAnswer(overrides, 'post.cargoCheck', true);
+    else if (name === 'no-fetch') setAnswer(overrides, 'post.fetch', false);
     else if (name === 'open') setAnswer(overrides, 'post.open', String(value));
     else if (name === 'gui') setAnswer(overrides, 'guiStack', String(value));
     else if (Object.hasOwn(DEFAULTS, name)) setAnswer(overrides, name, String(value));
@@ -155,6 +157,25 @@ export async function optionalUi(name: string) {
 }
 
 /** @param {any} caps @returns {Promise<string>} */
+/** `--with`/`--without` names, grouped and described in the same words the prompts use. */
+async function choiceHelp(caps: unknown): Promise<string[]> {
+  const labels = await import('./ui/labels.ts');
+  const rainbow = await optionalUi('rainbow');
+  const dimmed = (t: string) => rainbow.dim?.(caps, t) ?? t;
+  const tint = (c: string, t: string) => rainbow.hex?.(caps, c, t) ?? t;
+  const sections: [string, string, Record<string, { label: string; hint: string }>][] = [
+    ['crates', '#ff6ec7', { ...labels.CRATE_TOGGLES, tokio: { label: 'tokio', hint: labels.ASYNC.tokio.hint }, ureq: { label: 'ureq', hint: labels.HTTP.ureq.hint }, reqwest: { label: 'reqwest', hint: labels.HTTP.reqwest.hint }, tracing: { label: 'tracing', hint: labels.LOGGING.tracing.hint }, env_logger: { label: 'env_logger', hint: labels.LOGGING.env_logger.hint } }],
+    ['app features (desktop kinds)', '#ff9f6e', labels.FEATURES],
+    ['tooling', '#ffd36e', labels.TOOLING],
+  ];
+  const out = ['  Names for --with / --without:'];
+  for (const [title, color, cat] of sections) {
+    out.push('    ' + tint(color, title));
+    for (const [key, c] of Object.entries(cat)) out.push('      ' + key.padEnd(18) + c.label.padEnd(20) + dimmed(c.hint));
+  }
+  return out;
+}
+
 export async function renderHelp(caps: unknown) {
   const [rainbow, theme, banner] = await Promise.all([optionalUi('rainbow'), optionalUi('theme'), optionalUi('banner')]);
   const heading = (title: unknown) => theme.section?.(caps, 1, title) ?? title;
@@ -177,10 +198,12 @@ export async function renderHelp(caps: unknown) {
     '  --without <a,b>        Disable short names (repeatable)',
     '  --set <key.path=value> Override any answer leaf (repeatable; true/false or text)',
     '                        e.g. --set tagline="A useful app" --set post.git=false',
-    ...Object.entries(SHORT_NAMES).map(([key, [path, on, off]]: [string, [string, string | boolean, string | boolean]]) => '    ' + key.padEnd(18) + path + ' (' + on + ' / ' + off + ')'), '',
+    ...(await choiceHelp(caps)), '',
     heading('Run'),
     '  --yes, -y             Accept defaults without prompts',
     '  --no-git              Skip git initialization and initial commit',
+    '  --no-fetch            Skip cargo fetch after writing',
+    '  --cargo-check         Also run cargo check --all-targets (slow for GUI projects)',
     '  --no-cargo-check      Skip cargo check',
     '  --open <editor>       code | cursor (default: none)',
     '  --dry-run             Show planned files; write nothing and skip post-steps',

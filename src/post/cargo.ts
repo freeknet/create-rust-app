@@ -18,12 +18,22 @@ export function hasToolchain(pin: string) {
   return r.stdout.split(/\r?\n/).some((line: string) => line.trim() === pin || line.trim().startsWith(`${pin}-`));
 }
 
+type CargoOpts = { toolchain: string; onLine?: (line: string) => void; onHint?: (hint: string) => void };
+
 /**
- * @param {string} dir project directory
- * @param {{ toolchain: string, onLine?: (line: string) => void, onHint?: (hint: string) => void }} opts
- * @returns {Promise<boolean | null>} true ok, false failed, null skipped
+ * `cargo check --all-targets`: true ok, false failed, null skipped (no cargo / no toolchain).
+ * Slow for GUI projects (it compiles eframe/wgpu), so it is opt-in.
  */
-export async function cargoCheck(dir: string, { toolchain, onLine, onHint }: { toolchain: string; onLine?: (line: string) => void; onHint?: (hint: string) => void; }) {
+export function cargoCheck(dir: string, opts: CargoOpts) {
+  return cargo(dir, ['check', '--all-targets'], opts);
+}
+
+/** `cargo fetch`: downloads the dependency graph and writes Cargo.lock. Seconds, not minutes. */
+export function cargoFetch(dir: string, opts: CargoOpts) {
+  return cargo(dir, ['fetch'], opts);
+}
+
+async function cargo(dir: string, args: string[], { toolchain, onLine, onHint }: CargoOpts): Promise<boolean | null> {
   if (!onPath('cargo')) {
     onHint?.('cargo not found on PATH; install Rust from https://rustup.rs');
     return null;
@@ -33,7 +43,7 @@ export async function cargoCheck(dir: string, { toolchain, onLine, onHint }: { t
     return null;
   }
   return new Promise((resolve: (value: boolean | PromiseLike<boolean | null> | null) => void) => {
-    const child = spawn('cargo', ['check', '--all-targets'], {
+    const child = spawn('cargo', args, {
       cwd: dir, windowsHide: true, env: { ...process.env, CARGO_TERM_COLOR: 'never' },
     });
     let tail = '';

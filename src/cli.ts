@@ -65,6 +65,64 @@ export function fileTree(dests: string[], depth: number | undefined = Infinity, 
   return out.join('\n');
 }
 
+/** The commands to run next, for this kind of project. */
+export function nextCommands(a: Answers, shown: string): [string, string][] {
+  const out: [string, string][] = [];
+  if (shown !== '.') out.push([`cd ${shown}`, '']);
+  if (a.kind === 'lib') out.push(['cargo test', 'unit + doc tests']);
+  else out.push(['cargo run', a.kind === 'gui' || a.kind === 'workspace' ? 'first build takes a minute' : '']);
+  if (a.kind === 'workspace') out.push(['cargo xtask ci', 'the same gate CI runs']);
+  else out.push(['cargo clippy --all-targets -- -D warnings', 'the lint gate CI runs']);
+  return out;
+}
+
+/** Interactive run: ticked steps with timings, then the next-steps box and a sign-off. */
+async function runInteractive({ caps, answers, plan, target, shown, force }: {
+  caps: Caps; answers: Answers; plan: PlanEntry[]; target: string; shown: string; force: boolean;
+}) {
+  const p = await import('@clack/prompts');
+  const { dim, hex, paint } = await import('./ui/rainbow.ts');
+  const { cargoFetch } = await import('./post/cargo.ts');
+  const { reproduceCommand } = await import('./reproduce.ts');
+  const timed = async (fn: () => Promise<string>) => {
+    const t0 = performance.now();
+    const msg = await fn();
+    return `${msg}  ${dim(caps, `${((performance.now() - t0) / 1000).toFixed(1)}s`)}`;
+  };
+  const cargoTask = (label: string, run: typeof cargoFetch) => async (message: (s: string) => void) => timed(async () => {
+    let hint = '';
+    const ok = await run(target, {
+      toolchain: answers.toolchain,
+      onLine: (line) => message(`${label}  ${dim(caps, line.slice(0, Math.max(20, caps.columns - 30)))}`),
+      onHint: (h) => { hint = h; },
+    });
+    return ok === null ? `${label} skipped ${dim(caps, `(${hint})`)}` : ok ? `${label} done` : `${label} failed ${dim(caps, '(run it in the project for details)')}`;
+  });
+
+  await p.tasks([
+    { title: `Writing ${plan.length} files`, task: () => timed(async () => { await writePlan(plan, target, { force }); return `Wrote ${plan.length} files to ${shown}`; }) },
+    {
+      title: 'git init', enabled: answers.post.git, task: () => timed(async () => {
+        const r = initRepo(target, answers);
+        return r.ok === true ? 'Initialised git · first commit on main' : `git ${r.ok === false ? 'failed' : 'skipped'} ${dim(caps, `(${r.reason ?? ''})`)}`;
+      }),
+    },
+    { title: 'cargo fetch', enabled: answers.post.fetch, task: cargoTask('cargo fetch', cargoFetch) },
+    { title: 'cargo check', enabled: answers.post.cargoCheck, task: cargoTask('cargo check', cargoCheck) },
+  ]);
+  if (answers.post.open !== 'none') openEditor(target, answers.post.open);
+
+  const cmds = nextCommands(answers, shown);
+  const pad = Math.max(...cmds.map(([c]) => c.length)) + 3;
+  const lines = cmds.map(([c, note]) => (note ? `${c.padEnd(pad)}${dim(caps, `# ${note}`)}` : c));
+  // clack's `width` is a fraction of the terminal; 'auto' fits the content instead of stretching.
+  p.box(lines.join('\n'), ` ${hex(caps, '#7cf7ff', 'next')} `, {
+    contentPadding: 2, titlePadding: 1, rounded: true, width: 'auto',
+  });
+  p.log.message(`${dim(caps, 'again without prompts:')}\n${dim(caps, reproduceCommand(answers, shown === '.' ? '.' : undefined))}`);
+  p.outro(paint(caps, `${caps.unicode ? '◆' : '*'} build something luminous`, { offset: 140, step: 7 }));
+}
+
 /** An error that maps to a specific exit code (2 = bad arguments). */
 class Exit extends Error {
   code: number;
@@ -151,13 +209,9 @@ export async function main(argv: string[]) {
     }
 
     if (interactive) {
-      const p = await import('@clack/prompts');
-      p.note(fileTree(dests, 2, caps.unicode), `${shown}/ · ${dests.length} files`);
-      const ok = await p.confirm({ message: `Write ${dests.length} files to ${shown}?`, initialValue: true });
-      if (p.isCancel(ok) || !ok) {
-        p.cancel('Nothing written.');
-        return 130;
-      }
+      // The review screen already confirmed; this is the run + finish.
+      await runInteractive({ caps, answers, plan, target, shown, force: Boolean(flags.force) });
+      return 0;
     }
 
     await writePlan(plan, target, { force: Boolean(flags.force) });
@@ -179,6 +233,18 @@ export async function main(argv: string[]) {
       if (r.ok === false) log(`warning: ${r.reason}`);
       else if (r.ok === null) log(`git skipped: ${r.reason}`);
     }
+    if (answers.post.fetch) {
+      let hint = '';
+      spinner.start('cargo fetch');
+      const { cargoFetch } = await import('./post/cargo.ts');
+      const fetched = await cargoFetch(target, {
+        toolchain: answers.toolchain,
+        onLine: (line: string) => spinner.message(line.slice(0, Math.max(20, caps.columns - 10))),
+        onHint: (h: string) => { hint = h; },
+      });
+      if (fetched === null) spinner.stop(`cargo fetch skipped${hint ? ` (${hint})` : ''}`, true);
+      else spinner.stop(fetched ? 'cargo fetch done' : 'cargo fetch failed (run it in the project for details)', fetched);
+    }
     /** @type {boolean | null} */
     let cargoChecked: boolean | null = null;
     if (answers.post.cargoCheck) {
@@ -196,13 +262,17 @@ export async function main(argv: string[]) {
     if (answers.post.open !== 'none') openEditor(target, answers.post.open);
 
     if (!quiet) {
-      const summary = await optionalUi('summary');
-      if (summary.renderSummary) {
-        console.log(summary.renderSummary(caps, ctx, dests, { dir: shown, cargoChecked, git: gitDone }));
-      } else {
-        console.log(`\n${caps.unicode ? '✔' : '[ok]'} create-rust-app scaffolded ${answers.name} (${dests.length} files)`);
-        console.log(`\nNext:\n  cd ${shown}\n  cargo run\n  cargo test\n  cargo clippy --all-targets --all-features -- -D warnings`);
-      }
+      // Same words as the interactive review, without prompts or a file dump (--dry-run lists files).
+      const { reviewLines } = await import('./prompts.ts');
+      const { dim } = await import('./ui/rainbow.ts');
+      const { title, body } = reviewLines(caps, answers);
+      const ok = caps.unicode ? '✔' : '[ok]';
+      const checks = [gitDone && 'git', cargoChecked === true && 'cargo check'].filter(Boolean).join(' · ');
+      console.log(`\n${ok} ${title}  ${dim(caps, `${dests.length} files${checks ? ` · ${checks}` : ''}`)}\n`);
+      console.log(body.split('\n').map((l) => `  ${l}`).join('\n'));
+      console.log(`\n${dim(caps, 'next')}`);
+      for (const [cmd, note] of nextCommands(answers, shown)) console.log(`  ${cmd}${note ? `   ${dim(caps, `# ${note}`)}` : ''}`);
+      console.log('');
     }
     return 0;
   } catch (e) {

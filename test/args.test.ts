@@ -56,7 +56,7 @@ test('parseArgv: errors', () => {
 
 test('renderHelp: plain text lists flags and short names', async () => {
   const help = await renderHelp({ tier: 'none', unicode: false, tty: false, columns: 80, animate: false });
-  for (const s of ['--preset', '--with', '--set', '--no-cargo-check', 'palette', 'features.commandPalette']) {
+  for (const s of ['--preset', '--with', '--set', '--no-fetch', '--cargo-check', 'commandPalette', 'Command palette', 'Ctrl+K']) {
     assert.ok(help.includes(s), `help mentions ${s}`);
   }
 });

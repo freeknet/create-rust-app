@@ -40,9 +40,15 @@ cargo test
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-Needs Node 22.18+. Rust is optional at scaffold time; when `cargo` is on `PATH` the new project gets a
-`cargo check --all-targets` before you see the summary, and you get a `rustup toolchain install`
-hint if the pinned channel is missing.
+Interactively it's three screens: a name, what you're building, and a review of everything that
+will be generated in plain words. From the review you **Create it**, or **Customize…** any section
+(crates, app features, tooling, licence and Rust version, post-steps) and come back to it. The
+finish screen prints the next commands and the one-line command that recreates the project
+without prompts.
+
+Needs Node 22.18+. Rust is optional at scaffold time; when `cargo` is on `PATH` the new project gets
+a `cargo fetch` (and, with `--cargo-check`, a full `cargo check`), and you get a
+`rustup toolchain install` hint if the pinned channel is missing.
 
 ## Presets
 
@@ -83,7 +89,9 @@ create-rust-app [dir] [options]
 | `--without a,b` | Turn them off, e.g. `--without release,dependabot` |
 | `-y`, `--yes` | Accept defaults for anything not given; no prompts |
 | `--no-git` | Skip `git init -b main` and the initial commit |
-| `--no-cargo-check` | Skip the post-scaffold `cargo check --all-targets` |
+| `--no-fetch` | Skip `cargo fetch` after writing (on by default: seconds, not minutes) |
+| `--cargo-check` | Also run `cargo check --all-targets` (off by default; a GUI project compiles eframe/wgpu) |
+| `--no-cargo-check` | Skip `cargo check` even if a preset turns it on |
 | `--open <editor>` | Open the project in `code` or `cursor` when done |
 | `--dry-run` | Print the plan, write nothing |
 | `--json` | Machine-readable output |
