@@ -30,10 +30,12 @@ export function rail(caps: Caps) {
 export function text(caps: Caps, o: {
   message: string; placeholder?: string; defaultValue?: string; initialValue?: string;
   validate?: (v: string) => string | undefined;
+  io?: import('./choose.ts').Io;
 }) {
   const r = rail(caps);
   const anim = { t: 0 };
   const prompt = new TextPrompt({
+    ...(o.io ?? {}),
     ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
     ...(o.defaultValue !== undefined ? { defaultValue: o.defaultValue } : {}),
     ...(o.validate ? { validate: (v: string | undefined) => o.validate?.(v ?? o.defaultValue ?? '') } : {}),
@@ -41,11 +43,11 @@ export function text(caps: Caps, o: {
       const head = `${r.bar()}\n`;
       if (this.state === 'submit') return `${head}${r.done()}  ${o.message}\n${r.bar()}  ${dim(caps, this.value ?? '')}`;
       if (this.state === 'cancel') return `${head}${r.error(r.g.cancel)}  ${o.message}\n${r.bar()}`;
-      // Empty field: a blinking block cursor in front of the placeholder (blinks with the ticker).
-      const blink = !caps.animate || Math.floor(anim.t / 6) % 2 === 0;
+      // Only one line may change per animation tick (see motion.ts): here that's the marker, so the
+      // cursor in front of the placeholder stays steady.
       const input = this.userInput
         ? this.userInputWithCursor
-        : `${blink ? hex(caps, COLORS.live, r.g.cursor) : ' '}${dim(caps, o.placeholder ?? '')}`;
+        : `${hex(caps, COLORS.live, r.g.cursor)}${dim(caps, o.placeholder ?? '')}`;
       const err = this.state === 'error';
       const color = err ? COLORS.warn : COLORS.live;
       const step = err ? hex(caps, color, r.g.step) : marker(caps, r.g.step, anim.t);

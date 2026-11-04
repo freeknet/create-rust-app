@@ -39,8 +39,16 @@ export function live(caps: Caps, target: object, state: { t: number } = { t: 0 }
   if (!caps.animate) return state;
   // @clack/core types render() as private, but it is the method core itself calls on resize; it
   // diffs against the previous frame and repaints only changed lines.
-  const prompt = target as { render(): void; once(ev: string, fn: () => void): unknown };
-  const timer = setInterval(() => { state.t++; prompt.render(); }, TICK_MS);
+  const prompt = target as { render(): void; once(ev: string, fn: () => void): unknown; output?: { write(s: string): unknown } };
+  // Each tick repaints inside DEC synchronized output (mode 2026) so the terminal shows the finished
+  // frame, never a half-erased one. Terminals without it ignore the sequence.
+  const out = prompt.output ?? process.stdout;
+  const timer = setInterval(() => {
+    state.t++;
+    out.write('[?2026h');
+    prompt.render();
+    out.write('[?2026l');
+  }, TICK_MS);
   timer.unref();
   const stop = () => clearInterval(timer);
   prompt.once('finalize', stop);

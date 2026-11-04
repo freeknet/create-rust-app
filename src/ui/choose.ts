@@ -6,8 +6,9 @@
  * short, clean echo afterwards, grouped headers without selectable group rows, and our palette.
  */
 import { MultiSelectPrompt, SelectPrompt } from '@clack/core';
+import type { Readable, Writable } from 'node:stream';
 import { glyphs } from './glyphs.ts';
-import { live, marker, shimmer } from './motion.ts';
+import { live, shimmer } from './motion.ts';
 import { bold, dim, hex } from './rainbow.ts';
 import { STOPS } from './theme.ts';
 import { width, wrap } from './tty.ts';
@@ -48,11 +49,15 @@ const echo = (caps: Caps, lines: string[]) => {
 };
 
 /** Single choice. Resolves to the value, or clack's cancel symbol. */
-export function pick<V>(caps: Caps, o: { message: string; options: Item<V>[]; initialValue?: V; footer?: string }) {
+/** Optional streams (tests drive prompts in-process with these). */
+export type Io = { input?: Readable; output?: Writable };
+
+export function pick<V>(caps: Caps, o: { message: string; options: Item<V>[]; initialValue?: V; footer?: string; io?: Io }) {
   const c = chrome(caps);
   const rows = layout(caps, o.options, 6);
   const anim = { t: 0 };
   const prompt = new SelectPrompt<Item<V>>({
+    ...(o.io ?? {}),
     options: o.options,
     ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
     render() {
@@ -67,7 +72,7 @@ export function pick<V>(caps: Caps, o: { message: string; options: Item<V>[]; in
         return `${c.live()}  ${dot} ${label}${r.tag}${r.gap}${on ? r.hint : dim(caps, r.hint)}`;
       });
       const footer = `${c.live(c.g.barEnd)}  ${dim(caps, o.footer ?? `${c.g.up}${c.g.down} move · enter select · esc cancel`)}`;
-      return `${head}${marker(caps, c.g.step, anim.t)}  ${o.message}\n${body.join('\n')}\n${footer}`;
+      return `${head}${c.live(c.g.step)}  ${o.message}\n${body.join('\n')}\n${footer}`;
     },
   });
   live(caps, prompt, anim);
@@ -78,7 +83,7 @@ export function pick<V>(caps: Caps, o: { message: string; options: Item<V>[]; in
  * Multiple choice, optionally grouped (`item.group`). Group names render as coloured headers; only
  * items are selectable. Resolves to the selected values, or clack's cancel symbol.
  */
-export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]; initialValues?: V[] }) {
+export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]; initialValues?: V[]; io?: Io }) {
   const c = chrome(caps);
   const grouped = o.options.some((i) => i.group);
   const rows = layout(caps, o.options, grouped ? 8 : 6);
@@ -86,6 +91,7 @@ export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]
   for (const i of o.options) if (i.group && !groupColor.has(i.group)) groupColor.set(i.group, STOPS[(groupColor.size * 2 + 1) % STOPS.length] ?? CYAN);
   const anim = { t: 0 };
   const prompt = new MultiSelectPrompt<Item<V>>({
+    ...(o.io ?? {}),
     options: o.options,
     initialValues: o.initialValues ?? [],
     required: false,
@@ -113,7 +119,7 @@ export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]
         out.push(`${c.live()}  ${grouped ? '  ' : ''}${box} ${label}${r.gap}${on ? r.hint : dim(caps, r.hint)}`);
       });
       const footer = `${c.live(c.g.barEnd)}  ${dim(caps, 'space toggle · a all · enter confirm · esc cancel')}`;
-      return `${head}${marker(caps, c.g.step, anim.t)}  ${o.message}\n${out.join('\n')}\n${footer}`;
+      return `${head}${c.live(c.g.step)}  ${o.message}\n${out.join('\n')}\n${footer}`;
     },
   });
   live(caps, prompt, anim);
