@@ -8,6 +8,8 @@
  *   node tools/swarm/swarm.mjs log <id>          worker's final report
  *   node tools/swarm/swarm.mjs retry <id> "<feedback>"   resume that worker's thread with feedback
  *   node tools/swarm/swarm.mjs clean             remove worktrees (keeps branches)
+ *   node tools/swarm/swarm.mjs prepare <id>      create the task's worktree (for a non-Codex worker)
+ *   node tools/swarm/swarm.mjs finish <id>       ownership check + gate + commit + merge a worktree
  *
  * Task files: tools/swarm/tasks/<id>.md with frontmatter
  *   ---
@@ -187,7 +189,10 @@ function runCodex(t, row, o) {
               row.last = String(it.text ?? '').split('\n').find(Boolean) ?? row.last;
             }
           }
-          if (ev.type === 'error' || ev.type === 'turn.failed') row.last = `! ${ev.message ?? ev.error?.message ?? 'error'}`;
+          if (ev.type === 'error' || ev.type === 'turn.failed') {
+            row.last = `! ${ev.message ?? ev.error?.message ?? 'error'}`;
+            if (/usage limit|rate limit/i.test(row.last)) row.limited = true;
+          }
         } catch { /* partial or non-JSON line */ }
       }
     });
@@ -302,7 +307,7 @@ async function cmdRun(/** @type {string[]} */ argv) {
           try {
             prepareWorktree(t);
             const code = await runCodex(t, row, { model, effort, runDir });
-            if (code !== 0) throw new Error(`codex exited ${code}`);
+            if (code !== 0) throw new Error(row.limited ? `usage limit hit — partial work kept in .swarm/wt/${t.id}; resume with: swarm retry ${t.id} "continue"` : `codex exited ${code}`);
             await finish(t, row);
             row.state = 'merged';
             row.last = 'merged into swarm/integration';
@@ -372,9 +377,31 @@ function cmdClean() {
   console.log('worktrees removed (branches kept)');
 }
 
+/** Engine-agnostic hooks: any agent (Codex, Claude, a human) can work a worktree. */
+function cmdPrepare(/** @type {string} */ id) {
+  const t = loadTasks().find((x) => x.id === id);
+  if (!t) throw new Error(`no task ${id}`);
+  if (!gitOk(['rev-parse', '--verify', INTEGRATION])) git(['branch', INTEGRATION, 'main']);
+  const { wt } = prepareWorktree(t);
+  console.log(wt);
+}
+
+async function cmdFinish(/** @type {string} */ id) {
+  const t = loadTasks().find((x) => x.id === id);
+  if (!t) throw new Error(`no task ${id}`);
+  const run = `manual-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`;
+  mkdirSync(join(STATE, 'runs', run), { recursive: true });
+  /** @type {Row} */
+  const row = { id, title: t.title, state: 'running', events: 0, commands: 0, files: 0, tokens: 0, last: '', run };
+  await finish(t, row);
+  console.log(`merged ${id} into ${INTEGRATION}`);
+}
+
 const [cmd, ...rest] = process.argv.slice(2);
 try {
   if (cmd === 'run') await cmdRun(rest);
+  else if (cmd === 'prepare') cmdPrepare(rest[0]);
+  else if (cmd === 'finish') await cmdFinish(rest[0]);
   else if (cmd === 'status') cmdStatus();
   else if (cmd === 'log') cmdLog(rest[0]);
   else if (cmd === 'retry') await cmdRetry(rest[0], rest[1] ?? '', rest.slice(2));
