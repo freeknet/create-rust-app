@@ -2,28 +2,61 @@ type Tier = 'truecolor'|'ansi256'|'ansi16'|'none';
 export type { Caps } from '../types.ts';
 import type { Caps } from '../types.ts';
 import { stripVTControlCharacters } from 'node:util';
+import { spawnSync } from 'node:child_process';
+import { release } from 'node:os';
 
 /**
  * @typedef {'truecolor'|'ansi256'|'ansi16'|'none'} Tier
  * @typedef {{ tier: Tier, unicode: boolean, tty: boolean, columns: number, animate: boolean }} Caps
  */
 
+/** Windows build number from os.release() ("10.0.19045" → 19045), or 0 elsewhere. */
+function windowsBuild(): number {
+  if (process.platform !== 'win32') return 0;
+  return Number(release().split('.')[2] ?? 0) || 0;
+}
+
+/**
+ * The classic Windows console has no font fallback, so what it can draw depends on its font.
+ * HKCU\Console FaceName: "__DefaultTTFont__" is Consolas on Western locales; raster fonts and
+ * Lucida Console lack most of what we draw.
+ */
+function consoleFont(): string {
+  try {
+    const r = spawnSync('reg', ['query', 'HKCU\\Console', '/v', 'FaceName'], { encoding: 'utf8', windowsHide: true, timeout: 1500 });
+    return /FaceName\s+REG_SZ\s+(.+)/.exec(r.stdout ?? '')?.[1]?.trim() ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** Is this a modern terminal on Windows (full Unicode with font fallback)? */
+function modernWindowsTerminal(env: NodeJS.ProcessEnv): boolean {
+  return Boolean(env.WT_SESSION || env.TERM_PROGRAM === 'vscode' || env.VSCODE_PID || env.ConEmuANSI === 'ON'
+    || env.TERMINAL_EMULATOR === 'JetBrains-JediTerm' || /xterm|alacritty|wezterm/i.test(env.TERM ?? ''));
+}
+
 /** @param {{ noColor?: boolean }} [options] @returns {Caps} */
-export function detect({ noColor = false }: { noColor?: boolean; } | undefined = {}) {
+export function detect({ noColor = false }: { noColor?: boolean; } | undefined = {}): Caps {
   const env = process.env;
   const tty = Boolean(process.stdout.isTTY);
-  const vscode = env.TERM_PROGRAM === 'vscode' || Boolean(env.VSCODE_PID);
-  const unicode = env.TERM !== 'dumb' && (process.platform !== 'win32'
-    || Boolean(env.WT_SESSION || env.TERM_PROGRAM) || vscode);
-  /** @type {Tier} */
-  let tier: Tier = 'none';
+  const build = windowsBuild();
+  const winConsole = process.platform === 'win32' && !modernWindowsTerminal(env);
+
+  let glyphs: Caps['glyphs'] = 'full';
+  if (env.TERM === 'dumb' || env.TERM === 'linux') glyphs = 'ascii';
+  else if (winConsole) glyphs = /^(__DefaultTTFont__|Consolas|Cascadia)/i.test(consoleFont()) ? 'console' : 'ascii';
+
+  let tier: Caps['tier'] = 'none';
   if (tty && !noColor && env.NO_COLOR === undefined && !env.CI && env.TERM !== 'dumb') {
     if (/^(truecolor|24bit)$/i.test(env.COLORTERM || '') || env.WT_SESSION
-      || ['vscode', 'iTerm.app'].includes(env.TERM_PROGRAM || '')) tier = 'truecolor';
-    else if (/256color/i.test(env.TERM || '')) tier = 'ansi256';
+      || ['vscode', 'iTerm.app', 'WezTerm'].includes(env.TERM_PROGRAM || '')) tier = 'truecolor';
+    // Windows 10 1607 (build 14931) and later render 24-bit colour in the classic console too.
+    else if (build >= 14931) tier = 'truecolor';
+    else if (build >= 10586 || /256color/i.test(env.TERM || '')) tier = 'ansi256';
     else tier = 'ansi16';
   }
-  return { tier, unicode, tty, columns: columns(process.stdout.columns),
+  return { tier, glyphs, unicode: glyphs !== 'ascii', tty, columns: columns(process.stdout.columns),
     animate: tty && (tier === 'truecolor' || tier === 'ansi256') && !env.CI };
 }
 

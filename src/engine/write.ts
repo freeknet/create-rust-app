@@ -15,13 +15,14 @@ export async function isEmptyDir(dir: string) {
  * @param {{ force?: boolean, dryRun?: boolean }} [opts]
  * @returns {Promise<string[]>} dests written (or that would be)
  */
-export async function writePlan(plan: PlanEntry[], target: string, opts: { force?: boolean; dryRun?: boolean; } | undefined = {}) {
+export async function writePlan(plan: PlanEntry[], target: string, opts: { force?: boolean; dryRun?: boolean; onFile?: (dest: string, i: number, n: number) => void } | undefined = {}) {
   const dests = plan.map((e: PlanEntry) => e.dest);
   if (opts.dryRun) return dests;
   if (!opts.force && !(await isEmptyDir(target))) {
     throw new Error(`${target} is not empty. Pick another directory or pass --force.`);
   }
-  for (const e of plan) {
+  for (const [i, e] of plan.entries()) {
+    opts.onFile?.(e.dest, i + 1, plan.length);
     const out = join(target, ...e.dest.split('/'));
     await mkdir(dirname(out), { recursive: true });
     if ('copyFrom' in e) await copyFile(e.copyFrom, out);

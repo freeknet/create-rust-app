@@ -66,6 +66,8 @@ export type PlanEntry = { dest: string; content: string } | { dest: string; copy
 export interface Group { id: string; when: (ctx: Ctx) => boolean; mount?: (ctx: Ctx) => string }
 export interface Caps {
   tier: 'truecolor' | 'ansi256' | 'ansi16' | 'none';
+  /** Glyph set: full Unicode, the Windows console's Consolas subset, or ASCII. See ui/glyphs.ts. */
+  glyphs: 'full' | 'console' | 'ascii';
   unicode: boolean;
   tty: boolean;
   columns: number;

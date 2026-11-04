@@ -1,4 +1,5 @@
 type Caps = import('./tty.ts').Caps;
+import { glyphs } from './glyphs.ts';
 import { hsl, rgbText, hex } from './rainbow.ts';
 import { CHROME } from './theme.ts';
 import { plain, clip } from './tty.ts';
@@ -14,7 +15,7 @@ const ASCII = ['-', '\\', '|', '/'];
  * @param {{ out?: { write(s: string): unknown }, interval?: number }} [opts]
  */
 export function createSpinner(caps: Caps, { out = process.stdout, interval = 80 }: { out?: { write(s: string): unknown; }; interval?: number; } | undefined = {}) {
-  const frames = caps.unicode ? BRAILLE : ASCII;
+  const frames = glyphs(caps).spinner;
   /** @type {ReturnType<typeof setInterval> | null} */
   let timer: ReturnType<typeof setInterval> | null = null;
   let text = '';
@@ -40,7 +41,7 @@ export function createSpinner(caps: Caps, { out = process.stdout, interval = 80 
     start(msg: string) {
       text = fit(msg);
       if (!caps.animate) {
-        out.write(`${caps.unicode ? '…' : '...'} ${text}\n`);
+        out.write(`${glyphs(caps).ellipsis} ${text}\n`);
         return;
       }
       if (timer) return;
@@ -57,8 +58,8 @@ export function createSpinner(caps: Caps, { out = process.stdout, interval = 80 
     /** @param {string} [msg] @param {boolean} [ok] */
     stop(msg: string | undefined = text, ok: boolean | undefined = true) {
       const mark = ok
-        ? hex(caps, CHROME.success, caps.unicode ? '✔' : '[ok]')
-        : hex(caps, CHROME.danger, caps.unicode ? '✖' : '[x]');
+        ? hex(caps, CHROME.success, glyphs(caps).ok)
+        : hex(caps, CHROME.danger, glyphs(caps).fail);
       const line = `${mark} ${fit(msg)}`;
       if (timer) {
         clearInterval(timer);

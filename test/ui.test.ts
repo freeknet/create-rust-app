@@ -17,7 +17,10 @@ import { resolveAnswers } from '../src/presets.ts';
 /** @typedef {import('../src/ui/tty.ts').Caps} Caps */
 
 /** @param {Partial<Caps>} over @returns {Caps} */
-const caps = (over: Partial<Caps> = {}): Caps => ({ tier: 'truecolor', unicode: true, tty: true, columns: 80, animate: false, ...over });
+const caps = (over: Partial<Caps> = {}): Caps => {
+  const glyphs = over.glyphs ?? (over.unicode === false ? 'ascii' : 'full');
+  return { tier: 'truecolor', tty: true, columns: 80, animate: false, ...over, glyphs, unicode: glyphs !== 'ascii' };
+};
 
 const ctx = buildContext(resolveAnswers(null, {
   name: 'demo-app',

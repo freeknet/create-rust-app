@@ -1,6 +1,7 @@
 type Caps = import('./tty.ts').Caps;
 import { paint, hsl, fgCode, bold, dim } from './rainbow.ts';
 import { clip } from './tty.ts';
+import { glyphs } from './glyphs.ts';
 
 /** @typedef {import('./tty.ts').Caps} Caps */
 
@@ -28,7 +29,8 @@ export const BLOCK_WIDTH = WORDMARK.length * 4 - 1;
 function wordmark(caps: Caps, frame: number, max: number): string[] {
   // The sweep travels toward the brand hues and lands on them on the last frame.
   const drift = Math.max(0, FRAMES - 1 - frame) * 6;
-  if (caps.unicode && max >= BLOCK_WIDTH) {
+  // Block elements (▀▄█) are in Consolas too, so the classic Windows console gets the block logo.
+  if (caps.glyphs !== 'ascii' && max >= BLOCK_WIDTH) {
     return [0, 1, 2].map((row) => {
       let out = '';
       let col = 0;
@@ -61,8 +63,9 @@ export function bannerFrame(caps: Caps, frame: number) {
   if (caps.tier === 'none') return [clip(WORDMARK, max), clip(TAGLINE, max)];
   const rows = wordmark(caps, frame, max);
 
-  const diamond = caps.unicode ? '◇' : '-';
-  const ruleChar = caps.unicode ? '━' : '=';
+  const g = glyphs(caps);
+  const diamond = caps.glyphs === 'ascii' ? '-' : g.done;
+  const ruleChar = g.rule;
   const lead = `${diamond} ${TAGLINE} `;
   // The rule runs out to the wordmark's right edge so the two lines read as one block.
   const ruleLen = rows.length > 1 ? Math.max(8, BLOCK_WIDTH - lead.length) : RULE;

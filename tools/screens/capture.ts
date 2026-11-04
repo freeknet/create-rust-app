@@ -37,6 +37,22 @@ const SCENARIOS: Record<string, { args: (dir: string) => string[]; steps: Step[]
       ...Array.from({ length: 30 }, (_, i): Step => ({ keys: KEY.enter, wait: 700, shot: `${String(i + 2).padStart(2, '0')}-enter` })),
     ],
   },
+  // The same open prompt sampled over time: marker hue, label shimmer, cursor blink should move.
+  motion: {
+    args: () => [],
+    steps: [
+      { wait: 1700, shot: '01-t0' },
+      { wait: 400, shot: '02-t1' },
+      { keys: 'neon', wait: 200 },
+      { keys: KEY.enter, wait: 500, shot: '03-preset-t0' },
+      { wait: 400, shot: '04-preset-t1' },
+      { keys: KEY.enter, wait: 120, shot: '05-review-mid' },
+      { wait: 600, shot: '06-review' },
+      { keys: KEY.enter, wait: 300, shot: '07-tasks' },
+      { wait: 1200, shot: '08-fetch' },
+      { wait: 6000, shot: '09-done' },
+    ],
+  },
   cancel: {
     args: (dir) => [join(dir, 'demo-cancel')],
     steps: [{ wait: 1600 }, { keys: KEY.down, wait: 300 }, { keys: KEY.ctrlC, wait: 800, shot: '01-cancel' }],
@@ -129,8 +145,8 @@ async function run(name: string, outDir: string, tag = ''): Promise<string[]> {
     if (!step.shot) continue;
     const html = ser.serializeAsHTML({ includeGlobalBackground: false });
     const plain = Array.from({ length: term.buffer.active.length }, (_, i) => term.buffer.active.getLine(i)?.translateToString(true) ?? '').join('\n');
-    if (plain === last) continue; // nothing changed: skip duplicate frames
-    last = plain;
+    if (html === last) continue; // nothing changed (text or colour): skip duplicate frames
+    last = html;
     const file = join(outDir, `${name}${tag}-${step.shot}`);
     writeFileSync(`${file}.html`, page(html));
     writeFileSync(`${file}.txt`, plain);

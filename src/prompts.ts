@@ -7,7 +7,9 @@
  * also stands in for the back navigation clack doesn't have. Flags given on the command line are
  * never asked again.
  */
-import * as p from '@clack/prompts';
+import { isCancel } from '@clack/core';
+import { cancel, note, text } from './ui/rail.ts';
+import { glyphs } from './ui/glyphs.ts';
 import { PRESETS, resolveAnswers } from './presets.ts';
 import { validateName } from './context.ts';
 import { dim, hex, bold } from './ui/rainbow.ts';
@@ -29,9 +31,12 @@ const RECOMMENDED = 'rustaman';
 const PRESET_ORDER = ['rustaman', 'strobe', 'cli', 'tui', 'lib', 'minimal'];
 
 /** Unwrap a prompt result, turning Ctrl-C / Esc into a clean cancel. */
+/** Terminal caps for the running flow (set by ask), so a cancel anywhere renders consistently. */
+let flowCaps: Caps | null = null;
+
 function got<T>(value: T): Exclude<T, symbol> {
-  if (p.isCancel(value) || typeof value === 'symbol') {
-    p.cancel('Nothing written.');
+  if (isCancel(value) || typeof value === 'symbol') {
+    if (flowCaps) cancel(flowCaps, 'Nothing written.');
     throw new Cancelled();
   }
   return value as Exclude<T, symbol>;
@@ -47,7 +52,7 @@ const isGui = (a: Answers) => a.kind === 'gui' || a.kind === 'workspace';
 /** The review block: what will be generated, in human words, grouped and colour-keyed. */
 export function reviewLines(caps: Caps, a: Answers): { title: string; body: string } {
   const max = Math.max(40, Math.min(caps.columns, 100) - 18);
-  const sep = caps.unicode ? ' · ' : ' / ';
+  const sep = glyphs(caps).sep;
   // Sentence-case words read as a list; keep acronyms and file names as written (CI, SECURITY.md).
   const soft = (l: string) => (/^[A-Z][a-z]/.test(l) ? l[0]?.toLowerCase() + l.slice(1) : l);
   const on = <K extends string>(cat: Record<K, Choice>, values: Record<K, boolean>, group?: string) =>
@@ -94,11 +99,12 @@ export function reviewLines(caps: Caps, a: Answers): { title: string; body: stri
 
 /** Explicit command-line answers only; the preset's answers stay editable defaults. */
 export async function ask(partial: PartialAnswers, caps: Caps): Promise<Answers> {
+  flowCaps = caps;
   const given = (path: string) => path.split('.').reduce<unknown>((o, k) =>
     o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined, partial) !== undefined;
 
   // ── 1. name ──────────────────────────────────────────────────────────────
-  const name = given('name') ? String(partial.name) : got(await p.text({
+  const name = given('name') ? String(partial.name) : got(await text(caps, {
     message: 'Project name',
     placeholder: 'my-app',
     defaultValue: 'my-app',
@@ -121,7 +127,7 @@ export async function ask(partial: PartialAnswers, caps: Caps): Promise<Answers>
   // ── 3. review ⟲ customise ────────────────────────────────────────────────
   for (;;) {
     const { title, body } = reviewLines(caps, a);
-    p.note(body, title, { format: (l) => l });
+    await note(caps, title, body);
     const next = got(await pick(caps, {
       message: 'Ready?',
       initialValue: 'create',
@@ -199,8 +205,8 @@ async function customize(caps: Caps, a: Answers, repick: () => Promise<Answers>)
       message: 'Rust edition', initialValue: out.edition,
       options: ([{ value: '2024' as const, label: '2024', hint: 'current' }, { value: '2021' as const, label: '2021', hint: 'for older toolchains' }]),
     }));
-    out.msrv = got(await p.text({ message: 'Minimum supported Rust (rust-version)', initialValue: out.msrv, validate: (v) => (/^\d+\.\d+(?:\.\d+)?$/.test(v ?? '') ? undefined : 'Use a version like 1.98') }));
-    out.toolchain = got(await p.text({ message: 'Pinned toolchain (rust-toolchain.toml + CI)', initialValue: out.toolchain, validate: (v) => (/^\d+\.\d+\.\d+$/.test(v ?? '') ? undefined : 'Use an exact version like 1.99.1') }));
+    out.msrv = got(await text(caps, { message: 'Minimum supported Rust (rust-version)', initialValue: out.msrv, validate: (v) => (/^\d+\.\d+(?:\.\d+)?$/.test(v ?? '') ? undefined : 'Use a version like 1.98') }));
+    out.toolchain = got(await text(caps, { message: 'Pinned toolchain (rust-toolchain.toml + CI)', initialValue: out.toolchain, validate: (v) => (/^\d+\.\d+\.\d+$/.test(v ?? '') ? undefined : 'Use an exact version like 1.99.1') }));
   }
 
   if (which === 'after') {
@@ -224,8 +230,8 @@ async function customize(caps: Caps, a: Answers, repick: () => Promise<Answers>)
   }
 
   if (which === 'details') {
-    out.name = got(await p.text({ message: 'Project name', initialValue: out.name, validate: (v) => validateName(v ?? '') ?? undefined }));
-    out.tagline = got(await p.text({ message: 'One-line description', initialValue: out.tagline, placeholder: 'A Rust app.' }));
+    out.name = got(await text(caps, { message: 'Project name', initialValue: out.name, validate: (v) => validateName(v ?? '') ?? undefined }));
+    out.tagline = got(await text(caps, { message: 'One-line description', initialValue: out.tagline, placeholder: 'A Rust app.' }));
   }
   return out;
 }

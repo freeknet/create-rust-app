@@ -6,10 +6,8 @@
  * short, clean echo afterwards, grouped headers without selectable group rows, and our palette.
  */
 import { MultiSelectPrompt, SelectPrompt } from '@clack/core';
-import {
-  S_BAR, S_BAR_END, S_CHECKBOX_INACTIVE, S_CHECKBOX_SELECTED, S_RADIO_ACTIVE, S_RADIO_INACTIVE,
-  S_STEP_ACTIVE, S_STEP_CANCEL, S_STEP_SUBMIT,
-} from '@clack/prompts';
+import { glyphs } from './glyphs.ts';
+import { live, marker, shimmer } from './motion.ts';
 import { bold, dim, hex } from './rainbow.ts';
 import { STOPS } from './theme.ts';
 import { width, wrap } from './tty.ts';
@@ -24,10 +22,12 @@ const AMBER = '#ffd36e';
 const RED = '#ff6b7c';
 
 function chrome(caps: Caps) {
+  const g = glyphs(caps);
   return {
-    bar: (s = S_BAR) => hex(caps, GRAY, s),
-    live: (s = S_BAR) => hex(caps, CYAN, s),
-    done: (s = S_STEP_SUBMIT) => hex(caps, GREEN, s),
+    g,
+    bar: (s = g.bar) => hex(caps, GRAY, s),
+    live: (s = g.bar) => hex(caps, CYAN, s),
+    done: (s = g.done) => hex(caps, GREEN, s),
   };
 }
 
@@ -37,7 +37,7 @@ function layout<V>(caps: Caps, items: Item<V>[], indent: number) {
   const room = Math.max(10, caps.columns - indent - labelW - 6);
   return items.map((i) => {
     const used = width(i.label) + (i.tag ? width(i.tag) + 2 : 0);
-    const hint = i.hint && width(i.hint) > room ? `${i.hint.slice(0, room - 1)}…` : (i.hint ?? '');
+    const hint = i.hint && width(i.hint) > room ? `${i.hint.slice(0, room - 1)}${glyphs(caps).ellipsis}` : (i.hint ?? '');
     return { label: i.label, tag: i.tag ? `  ${hex(caps, AMBER, i.tag)}` : '', gap: ' '.repeat(labelW - used + 3), hint };
   });
 }
@@ -51,24 +51,27 @@ const echo = (caps: Caps, lines: string[]) => {
 export function pick<V>(caps: Caps, o: { message: string; options: Item<V>[]; initialValue?: V; footer?: string }) {
   const c = chrome(caps);
   const rows = layout(caps, o.options, 6);
-  return new SelectPrompt<Item<V>>({
+  const anim = { t: 0 };
+  const prompt = new SelectPrompt<Item<V>>({
     options: o.options,
     ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
     render() {
       const head = `${c.bar()}\n`;
       const chosen = this.options[this.cursor];
       if (this.state === 'submit') return `${head}${c.done()}  ${o.message}\n${echo(caps, [chosen?.label ?? ''])}`;
-      if (this.state === 'cancel') return `${head}${hex(caps, RED, S_STEP_CANCEL)}  ${o.message}\n${c.bar()}`;
+      if (this.state === 'cancel') return `${head}${hex(caps, RED, c.g.cancel)}  ${o.message}\n${c.bar()}`;
       const body = rows.map((r, i) => {
         const on = i === this.cursor;
-        const dot = on ? hex(caps, GREEN, S_RADIO_ACTIVE) : dim(caps, S_RADIO_INACTIVE);
-        const label = on ? bold(caps, r.label) : r.label;
-        return `${c.live()}  ${dot} ${label}${r.tag}${r.gap}${dim(caps, r.hint)}`;
+        const dot = on ? hex(caps, GREEN, c.g.radioOn) : dim(caps, c.g.radioOff);
+        const label = on ? shimmer(caps, r.label, anim.t) : r.label;
+        return `${c.live()}  ${dot} ${label}${r.tag}${r.gap}${on ? r.hint : dim(caps, r.hint)}`;
       });
-      const footer = `${c.live(S_BAR_END)}  ${dim(caps, o.footer ?? '↑↓ move · enter select · esc cancel')}`;
-      return `${head}${c.live(S_STEP_ACTIVE)}  ${o.message}\n${body.join('\n')}\n${footer}`;
+      const footer = `${c.live(c.g.barEnd)}  ${dim(caps, o.footer ?? `${c.g.up}${c.g.down} move · enter select · esc cancel`)}`;
+      return `${head}${marker(caps, c.g.step, anim.t)}  ${o.message}\n${body.join('\n')}\n${footer}`;
     },
-  }).prompt() as Promise<V | symbol>;
+  });
+  live(caps, prompt, anim);
+  return prompt.prompt() as Promise<V | symbol>;
 }
 
 /**
@@ -81,7 +84,8 @@ export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]
   const rows = layout(caps, o.options, grouped ? 8 : 6);
   const groupColor = new Map<string, string>();
   for (const i of o.options) if (i.group && !groupColor.has(i.group)) groupColor.set(i.group, STOPS[(groupColor.size * 2 + 1) % STOPS.length] ?? CYAN);
-  return new MultiSelectPrompt<Item<V>>({
+  const anim = { t: 0 };
+  const prompt = new MultiSelectPrompt<Item<V>>({
     options: o.options,
     initialValues: o.initialValues ?? [],
     required: false,
@@ -90,10 +94,10 @@ export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]
       const selected = new Set(this.value ?? []);
       if (this.state === 'submit') {
         const names = o.options.filter((i) => selected.has(i.value)).map((i) => i.label);
-        const lines = names.length ? wrap(names.join(' · '), Math.max(20, caps.columns - 6)) : ['none'];
+        const lines = names.length ? wrap(names.join(c.g.sep.trim() ? c.g.sep : ' '), Math.max(20, caps.columns - 6)) : ['none'];
         return `${head}${c.done()}  ${o.message}\n${echo(caps, lines)}`;
       }
-      if (this.state === 'cancel') return `${head}${hex(caps, RED, S_STEP_CANCEL)}  ${o.message}\n${c.bar()}`;
+      if (this.state === 'cancel') return `${head}${hex(caps, RED, c.g.cancel)}  ${o.message}\n${c.bar()}`;
       const out: string[] = [];
       let lastGroup: string | undefined;
       o.options.forEach((item, i) => {
@@ -104,12 +108,14 @@ export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]
         const r = rows[i];
         if (!r) return;
         const on = i === this.cursor;
-        const box = selected.has(item.value) ? hex(caps, GREEN, S_CHECKBOX_SELECTED) : dim(caps, S_CHECKBOX_INACTIVE);
-        const label = on ? bold(caps, r.label) : r.label;
-        out.push(`${c.live()}  ${grouped ? '  ' : ''}${box} ${label}${r.gap}${dim(caps, r.hint)}`);
+        const box = selected.has(item.value) ? hex(caps, GREEN, c.g.boxOn) : dim(caps, c.g.boxOff);
+        const label = on ? shimmer(caps, r.label, anim.t) : r.label;
+        out.push(`${c.live()}  ${grouped ? '  ' : ''}${box} ${label}${r.gap}${on ? r.hint : dim(caps, r.hint)}`);
       });
-      const footer = `${c.live(S_BAR_END)}  ${dim(caps, 'space toggle · a all · enter confirm · esc cancel')}`;
-      return `${head}${c.live(S_STEP_ACTIVE)}  ${o.message}\n${out.join('\n')}\n${footer}`;
+      const footer = `${c.live(c.g.barEnd)}  ${dim(caps, 'space toggle · a all · enter confirm · esc cancel')}`;
+      return `${head}${marker(caps, c.g.step, anim.t)}  ${o.message}\n${out.join('\n')}\n${footer}`;
     },
-  }).prompt() as Promise<V[] | symbol>;
+  });
+  live(caps, prompt, anim);
+  return prompt.prompt() as Promise<V[] | symbol>;
 }

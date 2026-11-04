@@ -23,6 +23,7 @@ function fallbackCaps({ noColor = false }: { noColor?: boolean; } | undefined = 
   const color = tty && !noColor && process.env.NO_COLOR === undefined && !process.env.CI;
   return {
     tier: color ? 'ansi16' : 'none',
+    glyphs: process.platform !== 'win32' || process.env.WT_SESSION ? 'full' : 'ascii',
     unicode: process.platform !== 'win32' || Boolean(process.env.WT_SESSION),
     tty, columns: process.stdout.columns || 80, animate: false,
   };
@@ -80,47 +81,55 @@ export function nextCommands(a: Answers, shown: string): [string, string][] {
 async function runInteractive({ caps, answers, plan, target, shown, force }: {
   caps: Caps; answers: Answers; plan: PlanEntry[]; target: string; shown: string; force: boolean;
 }) {
-  const p = await import('@clack/prompts');
-  const { dim, hex, paint } = await import('./ui/rainbow.ts');
+  const { dim, paint } = await import('./ui/rainbow.ts');
+  const { box, log, outro, tasks } = await import('./ui/rail.ts');
+  const { glyphs } = await import('./ui/glyphs.ts');
   const { cargoFetch } = await import('./post/cargo.ts');
   const { reproduceCommand } = await import('./reproduce.ts');
-  const timed = async (fn: () => Promise<string>) => {
-    const t0 = performance.now();
-    const msg = await fn();
-    return `${msg}  ${dim(caps, `${((performance.now() - t0) / 1000).toFixed(1)}s`)}`;
-  };
-  const cargoTask = (label: string, run: typeof cargoFetch) => async (message: (s: string) => void) => timed(async () => {
+  const g = glyphs(caps);
+  const cargoTask = (label: string, run: typeof cargoFetch) => async (update: (s: string) => void) => {
     let hint = '';
+    let crates = 0;
     const ok = await run(target, {
       toolchain: answers.toolchain,
-      onLine: (line) => message(`${label}  ${dim(caps, line.slice(0, Math.max(20, caps.columns - 30)))}`),
+      onLine: (line) => {
+        // "Downloaded egui v0.37.0" → count it and show the newest crate.
+        const m = /^(?:Downloaded|Compiling|Checking)\s+(\S+ v\S+)/.exec(line);
+        if (m) crates++;
+        update(m ? `${crates} crates${g.sep}${m[1]}` : line.slice(0, Math.max(20, caps.columns - 30)));
+      },
       onHint: (h) => { hint = h; },
     });
-    return ok === null ? `${label} skipped ${dim(caps, `(${hint})`)}` : ok ? `${label} done` : `${label} failed ${dim(caps, '(run it in the project for details)')}`;
-  });
+    return ok === null
+      ? { ok, message: `${label} skipped ${dim(caps, `(${hint})`)}` }
+      : { ok, message: ok ? `${label} done` : `${label} failed ${dim(caps, '(run it in the project for details)')}` };
+  };
 
-  await p.tasks([
-    { title: `Writing ${plan.length} files`, task: () => timed(async () => { await writePlan(plan, target, { force }); return `Wrote ${plan.length} files to ${shown}`; }) },
+  await tasks(caps, [
     {
-      title: 'git init', enabled: answers.post.git, task: () => timed(async () => {
-        const r = initRepo(target, answers);
-        return r.ok === true ? 'Initialised git · first commit on main' : `git ${r.ok === false ? 'failed' : 'skipped'} ${dim(caps, `(${r.reason ?? ''})`)}`;
-      }),
+      title: `Writing ${plan.length} files`, run: async (update) => {
+        await writePlan(plan, target, { force, onFile: (dest, i, n) => update(`${String(i).padStart(String(n).length)}/${n}  ${dest}`) });
+        return { ok: true, message: `Wrote ${plan.length} files to ${shown}` };
+      },
     },
-    { title: 'cargo fetch', enabled: answers.post.fetch, task: cargoTask('cargo fetch', cargoFetch) },
-    { title: 'cargo check', enabled: answers.post.cargoCheck, task: cargoTask('cargo check', cargoCheck) },
+    {
+      title: 'git init', enabled: answers.post.git, run: async () => {
+        const r = initRepo(target, answers);
+        return r.ok === true
+          ? { ok: true, message: `Initialised git${g.sep}first commit on main` }
+          : { ok: r.ok, message: `git ${r.ok === false ? 'failed' : 'skipped'} ${dim(caps, `(${r.reason ?? ''})`)}` };
+      },
+    },
+    { title: 'cargo fetch', enabled: answers.post.fetch, run: cargoTask('cargo fetch', cargoFetch) },
+    { title: 'cargo check', enabled: answers.post.cargoCheck, run: cargoTask('cargo check', cargoCheck) },
   ]);
   if (answers.post.open !== 'none') openEditor(target, answers.post.open);
 
   const cmds = nextCommands(answers, shown);
   const pad = Math.max(...cmds.map(([c]) => c.length)) + 3;
-  const lines = cmds.map(([c, note]) => (note ? `${c.padEnd(pad)}${dim(caps, `# ${note}`)}` : c));
-  // clack's `width` is a fraction of the terminal; 'auto' fits the content instead of stretching.
-  p.box(lines.join('\n'), ` ${hex(caps, '#7cf7ff', 'next')} `, {
-    contentPadding: 2, titlePadding: 1, rounded: true, width: 'auto',
-  });
-  p.log.message(`${dim(caps, 'again without prompts:')}\n${dim(caps, reproduceCommand(answers, shown === '.' ? '.' : undefined))}`);
-  p.outro(paint(caps, `${caps.unicode ? '◆' : '*'} build something luminous`, { offset: 140, step: 7 }));
+  box(caps, 'next', cmds.map(([c, note]) => (note ? `${c.padEnd(pad)}${dim(caps, `# ${note}`)}` : c)));
+  log(caps, [dim(caps, 'again without prompts:'), dim(caps, reproduceCommand(answers, shown === '.' ? '.' : undefined))]);
+  await outro(caps, 'build something luminous');
 }
 
 /** An error that maps to a specific exit code (2 = bad arguments). */
@@ -266,7 +275,7 @@ export async function main(argv: string[]) {
       const { reviewLines } = await import('./prompts.ts');
       const { dim } = await import('./ui/rainbow.ts');
       const { title, body } = reviewLines(caps, answers);
-      const ok = caps.unicode ? '✔' : '[ok]';
+      const ok = (await import('./ui/glyphs.ts')).glyphs(caps).ok;
       const checks = [gitDone && 'git', cargoChecked === true && 'cargo check'].filter(Boolean).join(' · ');
       console.log(`\n${ok} ${title}  ${dim(caps, `${dests.length} files${checks ? ` · ${checks}` : ''}`)}\n`);
       console.log(body.split('\n').map((l) => `  ${l}`).join('\n'));
@@ -279,7 +288,7 @@ export async function main(argv: string[]) {
     if (e && typeof e === 'object' && 'exitCode' in e && e.exitCode === 130) return 130;
     const code = e instanceof Exit ? e.code : 1;
     const msg = e instanceof Error ? e.message : String(e);
-    console.error(red(`${caps.unicode ? '✖' : 'error:'} ${msg}`));
+    console.error(red(`${caps.glyphs === 'ascii' ? 'error:' : (caps.glyphs === 'console' ? '×' : '✖')} ${msg}`));
     if (process.env.DEBUG && e instanceof Error && !(e instanceof Exit)) console.error(e.stack);
     return code;
   }
