@@ -209,7 +209,7 @@ node scripts/scaffold-check.mjs <preset> --gate check   # cargo check only, fast
 node scripts/scaffold-check.mjs cli --set crates.async=tokio --set crates.http=reqwest
 ```
 
-Strict TypeScript with only two runtime dependencies (`@clack/prompts`, `picocolors`). Node runs
+Strict TypeScript with only two runtime dependencies (`@clack/core`, `picocolors`). Node runs
 the `.ts` sources directly during development, but it won't strip types inside `node_modules`,
 which is where `npx` runs from, so the package ships compiled JS from `dist/`. Shared shapes
 (`Answers`, `Ctx`, `Dep`, `PlanEntry`) live in `src/types.ts`.
