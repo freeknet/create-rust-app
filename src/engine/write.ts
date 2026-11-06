@@ -1,8 +1,17 @@
 import { mkdir, readdir, writeFile, copyFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-/** @param {string} dir */
+/** Why `dir` can't be scaffolded into, or null if it can. A lone `.git` doesn't count as content. */
+export function targetProblem(dir: string): string | null {
+  if (!existsSync(dir)) return null;
+  try {
+    return readdirSync(dir).some((e) => e !== '.git') ? `${dir} is not empty. Pick another directory or pass --force.` : null;
+  } catch {
+    return `${dir} exists and isn't a directory.`;
+  }
+}
+
 export async function isEmptyDir(dir: string) {
   if (!existsSync(dir)) return true;
   const entries = await readdir(dir);

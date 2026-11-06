@@ -98,7 +98,7 @@ export function reviewLines(caps: Caps, a: Answers): { title: string; body: stri
 }
 
 /** Explicit command-line answers only; the preset's answers stay editable defaults. */
-export async function ask(partial: PartialAnswers, caps: Caps): Promise<Answers> {
+export async function ask(partial: PartialAnswers, caps: Caps, targetCheck: (name: string) => string | null = () => null): Promise<Answers> {
   flowCaps = caps;
   const given = (path: string) => path.split('.').reduce<unknown>((o, k) =>
     o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined, partial) !== undefined;
@@ -108,7 +108,7 @@ export async function ask(partial: PartialAnswers, caps: Caps): Promise<Answers>
     message: 'Project name',
     placeholder: 'my-app',
     defaultValue: 'my-app',
-    validate: (v) => (v ? validateName(v) ?? undefined : undefined),
+    validate: (v) => validateName(v || 'my-app') ?? targetCheck(v || 'my-app') ?? undefined,
   }));
 
   // ── 2. what are you building ─────────────────────────────────────────────
@@ -139,7 +139,7 @@ export async function ask(partial: PartialAnswers, caps: Caps): Promise<Answers>
     }));
     if (next === 'create') return a;
     if (next === 'cancel') got(Symbol.for('clack:cancel'));
-    a = await customize(caps, a, async () => {
+    a = await customize(caps, a, targetCheck, async () => {
       preset = await pickPreset(preset ?? RECOMMENDED);
       return resolveAnswers(preset, { ...partial, name: a.name });
     });
@@ -147,7 +147,7 @@ export async function ask(partial: PartialAnswers, caps: Caps): Promise<Answers>
 }
 
 /** One section at a time, then back to the review. */
-async function customize(caps: Caps, a: Answers, repick: () => Promise<Answers>): Promise<Answers> {
+async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => string | null, repick: () => Promise<Answers>): Promise<Answers> {
   const sections: Item<string>[] = ([
     { value: 'crates', label: 'Crates', hint: 'logging, async, HTTP, serde, SQLite…' },
     ...(isGui(a) ? [{ value: 'app', label: 'App', hint: 'GUI runtime, themes, tray, palette…' }] : []),
@@ -230,7 +230,7 @@ async function customize(caps: Caps, a: Answers, repick: () => Promise<Answers>)
   }
 
   if (which === 'details') {
-    out.name = got(await text(caps, { message: 'Project name', initialValue: out.name, validate: (v) => validateName(v ?? '') ?? undefined }));
+    out.name = got(await text(caps, { message: 'Project name', initialValue: out.name, validate: (v) => validateName(v ?? '') ?? targetCheck(v ?? '') ?? undefined }));
     out.tagline = got(await text(caps, { message: 'One-line description', initialValue: out.tagline, placeholder: 'A Rust app.' }));
   }
   return out;

@@ -1,9 +1,8 @@
 # create-rust-app — implementation plan
 
-Planned by Fable from a read of the author's two Rust projects (`strobe`, `rustaman`, both
-in `C:\Users\ADUPU\Documents\Development\`). This is the spec every task works from.
-Contracts that code must agree on live in [CONTRACTS.md](CONTRACTS.md) and win over this file
-where they differ.
+Planned from a read of the author's two Rust projects, `strobe` and `rustaman`. Sections 1, 2 and 5
+are the original plan; sections 3 and 4 describe what was built. Contracts that code must agree on
+live in [CONTRACTS.md](CONTRACTS.md) and win over this file where they differ.
 
 Name: `create-rust-app` only (`npx create-rust-app`, `npm create rust-app`). No drug or
 acid wording anywhere. The look is psychedelic rainbow, nerdy, slick.
@@ -175,7 +174,7 @@ debug = "line-tables-only"
 | theme | accent ★`#00e5ff` |
 | post | git ★ (init + initial commit `feat: scaffold <name> with create-rust-app`), cargoCheck ★ if cargo is on PATH, open: none ★ / code / cursor |
 
-Presets (`--preset`): `rustaman` (single-crate Windows GUI, eframe, edition 2021, MIT, winres,
+Presets (`--preset`): `rustaman` (single-crate desktop GUI, eframe, edition 2024, MIT, winres,
 screenshot example), `strobe` (workspace desktop app, winit-glow, edition 2024, MIT+CommonsClause,
 xtask, conventions crate, embed-resource `.rc`, THIRD_PARTY), `cli` (clap + anyhow + log/env_logger,
 all tooling), `tui` (ratatui + crossterm), `lib` (thiserror, no bin, docs.rs metadata), `minimal`
@@ -183,50 +182,46 @@ all tooling), `tui` (ratatui + crossterm), `lib` (thiserror, no bin, docs.rs met
 
 ## 3. Node CLI architecture
 
-- Plain ESM JS, no build step. `"type": "module"`, `"engines": {"node": ">=20"}`, one bin
-  `create-rust-app`. `// @ts-check` + JSDoc.
-- Runtime deps: `@clack/prompts`, `picocolors`. Everything else hand-rolled: arg parsing with
-  `node:util` `parseArgs`, truecolor gradients in `src/ui/rainbow.js`, block-letter banner in
-  `src/ui/banner.js`, cargo detection with `spawnSync`.
+- Strict TypeScript, compiled to `dist/` for publishing because Node won't strip types under
+  `node_modules`. `"engines": {"node": ">=22.18.0"}`, one bin `create-rust-app`.
+- Runtime deps: `@clack/core` (prompt state machines and key handling) and `picocolors`. Everything
+  else is hand-rolled: arg parsing with `node:util` `parseArgs`, gradients in `src/ui/rainbow.ts`, the
+  banner in `src/ui/banner.ts`, rendering in `src/ui/{rail,choose,motion}.ts`.
 - Flags: `create-rust-app [dir] --name --preset <p> --kind --gui <eframe|winit-glow> --edition --msrv
-  --toolchain --license --author --github --accent --with a,b --without a,b --yes/-y --no-git
-  --no-cargo-check --open <code|cursor> --dry-run --json --no-color --quiet --force --help --version`.
-  Non-TTY implies `--yes`.
+  --toolchain --license --author --github --accent --with a,b --without a,b --set key.path=value
+  --yes/-y --no-git --no-fetch --cargo-check --no-cargo-check --open <code|cursor> --dry-run --json
+  --no-color --quiet --force --help --version`. Non-TTY implies `--yes`.
 - Templates: see CONTRACTS.md (groups, manifests, `@@token@@`, line directives). Cargo.toml and
-  deny.toml are composed in JS (`src/gen/`), not templated.
-- Post-steps: `git init -b main` + add + commit; optional `cargo check --all-targets` under a spinner;
-  hint `rustup toolchain install <pin>` when the pinned channel is missing; `--open` spawns the editor detached.
+  deny.toml are composed in code (`src/gen/`), not templated.
+- A target folder with content is refused before any question unless `--force` is passed. In the run,
+  writing is a required step: if it fails, nothing after it runs.
+- Post-steps: `git init -b main` + add + commit; `cargo fetch` by default; opt-in `cargo check
+  --all-targets`; a `rustup toolchain install <pin>` hint when the pin is missing; `--open` spawns the
+  editor detached.
 
 ## 4. UX
 
-- Capability tiers (`src/ui/tty.js`): `truecolor` (TTY && !NO_COLOR && (COLORTERM truecolor/24bit ||
-  WT_SESSION || TERM_PROGRAM vscode/iTerm.app)), `ansi256`, `ansi16`, `none` (NO_COLOR, `--no-color`,
-  non-TTY, CI). Animation only on truecolor/ansi256 TTYs.
-- Banner (direction "Prism", APPROVED by the user — match it exactly):
-
-  ```
-  C R E A T E - R U S T - A P P          <- bold, each char its own hue, sweep left→right
-  ◇ scaffold rust projects at the speed of light ━━━━━━━━━━━━━━━━━━━━   <- dim text + rainbow rule
-  ```
-
-  The wordmark is the plain string `CREATE-RUST-APP` with letter-spacing (one space between
-  characters), bold, char i coloured hue = `(i*9 + frame*8) % 360`, sat 0.95 light 0.68 (HSL).
-  The rule is 20 `━` coloured hue = `(i*40 + frame*12) % 360`. Animate ~30 frames × 33 ms by
-  rewriting the two lines in place (cursor up), then settle on the last frame. No colour tier → plain
-  `CREATE-RUST-APP` and `scaffold rust projects at the speed of light`, no animation.
-- Prompt bullets: each step's `◆` takes the next rainbow stop (pink `#ff6ec7`, cyan `#7cf7ff`,
-  lime `#b6ff6e`, amber `#ffd36e`, violet `#8a5cff`, coral `#ff9f6e`), label in default fg,
-  `›` dim, answer white; selected option shown `● value` in lime, others `○ value` dim.
-- Prompts: clack, `intro("create-rust-app")`, grouped steps
-  (identity → kind → stack → crates → features → tooling → post), each section title tinted along the
-  rainbow; `note()` previews the file tree before writing; `cancel("Nothing written.")` on Ctrl-C.
-- Palette: rainbow stops `#ff2d95 → #ff7a18 → #ffd400 → #2bff88 → #00e5ff → #7b5bff → #ff2d95`;
-  chrome: dim `#9aa8bc`, success `#5fd08a`, warning `#ff9a47`, danger `#ff6b7c`, prompt bar `#00e5ff`.
-- Spinner: braille frames `⣾⣽⣻⢿⡿⣟⣯⣷` recoloured per tick along the rainbow; ASCII `-\|/` fallback.
-- Summary: gradient rule, `✔ create-rust-app scaffolded <name>`, 2-column table (kind, stack,
-  edition/MSRV/toolchain, licence, features, tooling), tree to depth 2, a "Next" box
-  (`cd <dir>`, `cargo run`, `cargo test`, `cargo clippy --all-targets --all-features -- -D warnings`).
-  Boxes `─│╭╮╰╯`, ASCII fallback. With tier `none` everything is plain, `✔`→`[ok]`, no cursor moves.
+- Capability detection (`src/ui/tty.ts`): colour tier `truecolor` / `ansi256` / `ansi16` / `none`, with
+  `none` for NO_COLOR, `--no-color`, non-TTY and CI. Windows 10 build 14931+ counts as truecolor, classic
+  console included. Glyph level `full` / `console` / `ascii` (`src/ui/glyphs.ts`): `console` is the classic
+  Windows console with Consolas or Cascadia, read from `HKCU\Console`, which has no font fallback.
+- Banner ("Prism"): 3-row block-letter `CREATE-RUST-APP` with hue running across columns from 140°
+  (green → cyan → violet), a dim tagline and a rainbow rule ending at the wordmark's edge. It sweeps for
+  about a second and settles on the brand hues. Narrower than 59 columns or `ascii`: one bold line. No
+  colour: plain text.
+- Flow (`src/prompts.ts`): name → what are you building → review, which offers Create it / Customize… /
+  Cancel. Customize opens one section at a time and returns to the review. Flags are never asked again.
+- Options show a description on every row and echo short labels after submit (`src/ui/choose.ts`).
+- Run: ticked steps with timings and live counters, then a next-steps box, the equivalent
+  non-interactive command, and a closing line.
+- Motion (`src/ui/motion.ts`), off when `caps.animate` is false: the focused option shimmers; the name
+  prompt's marker cycles hue; a three-cell spinner; the review cascades in; the closing line sparkles.
+  **Each prompt animates one line only.** Two changed lines make clack erase and repaint everything
+  below them, which flickers; `test/motion.test.ts` guards this.
+- Palette: prompt stops `#ff6ec7 #7cf7ff #b6ff6e #ffd36e #8a5cff #ff9f6e`; chrome: dim `#9aa8bc`, rail
+  `#6f6a85`, warning `#ffd36e`, danger `#ff6b7c`.
+- Judge UI changes by looking at them: `node tools/screens/capture.ts <scenario>` drives the real CLI in a
+  pseudo-terminal and renders each screen to PNG.
 
 ## 5. Verification
 

@@ -1,7 +1,6 @@
 # Contracts
 
-Every module codes against these. If you need to change one, say so in your final message —
-do not silently change it.
+Every module codes against these. Change one deliberately, and update this file with it.
 
 The shared TypeScript shapes are declared in `src/types.ts`; the prose below specifies
 the runtime behavior and template conventions.
@@ -11,20 +10,21 @@ the runtime behavior and template conventions.
 ```
 bin/create-rust-app.ts     entry; imports src/cli.ts and calls main(process.argv.slice(2))
 src/cli.ts                 main(argv): args → answers → ctx → plan → write → post → summary
-src/args.ts                parseArgv(argv) → { dir, flags }           (node:util parseArgs)
+src/args.ts                parseArgv(argv) → { dir, flags, overrides } (node:util parseArgs)
 src/presets.ts             PRESETS: Record<id, Partial<Answers>>; DEFAULTS: Answers
-src/prompts.ts             ask(partial, ui) → Answers                  (@clack/prompts)
+src/prompts.ts             ask(partial, caps, targetCheck) → Answers   (@clack/core)
 src/context.ts             buildContext(answers) → Ctx                 (CORE, exists)
 src/engine/directives.ts   applyDirectives(text, flags) → text         (CORE, exists)
 src/engine/render.ts       renderText(text, ctx, dest) → text          (CORE, exists)
 src/engine/groups.ts       GROUPS: [{ id, when(ctx) }]                 (CORE, exists)
 src/engine/plan.ts         buildPlan(ctx) → Promise<PlanEntry[]>       (CORE, exists)
-src/engine/write.ts        writePlan(plan, targetDir, {force, dryRun}) (CORE, exists)
+src/engine/write.ts        writePlan(plan, targetDir, {force, dryRun, onFile}); targetProblem(dir)
 src/gen/header.ts          moduleFor(dest, ctx) → string               (CORE, exists)
 src/gen/index.ts           generate(ctx) → PlanEntry[]                 (Cargo.toml, deny.toml …)
 src/gen/cargo.ts, deps.ts, deny.ts
 src/post/{git,cargo,open}.ts
-src/ui/{tty,rainbow,banner,theme,spinner,summary}.ts
+src/reproduce.ts           reproduceCommand(answers, dir?) → string
+src/ui/{tty,glyphs,rainbow,banner,theme,labels,choose,rail,motion,spinner}.ts
 templates/<group>/files/** template files; templates/<group>/manifest.js optional
 test/*.test.ts             node --test
 ```
@@ -161,26 +161,31 @@ Cargo target auto-discovery is relied on: `src/lib.rs`, `src/main.rs`, `src/bin/
   glow loop needs lives in `src/gui/glow/` (owned by gui-glow).
 - `egui` is a direct dependency in both stacks (`egui = "0.37"`) so app code names `egui::` not `eframe::egui::`.
 
-## UI API (`src/ui/*`, used by `src/cli.ts`)
+## UI API (`src/ui/*`, used by `src/cli.ts` and `src/prompts.ts`)
 
-```js
+```ts
 // tty.ts
-detect({ noColor?: boolean }) → { tier: 'truecolor'|'ansi256'|'ansi16'|'none', unicode: boolean,
-                                  tty: boolean, columns: number, animate: boolean }
-// rainbow.ts  (all return plain text when caps.tier === 'none')
-paint(caps, text, { offset = 0, step = 9 } = {}) → string     // per-char hue sweep
-hex(caps, '#ff6ec7', text) → string;  dim(caps, text);  bold(caps, text)
+detect({ noColor? }) → Caps  // { tier, glyphs: 'full'|'console'|'ascii', unicode, tty, columns, animate }
+// glyphs.ts: every drawn character comes from here, never a literal
+glyphs(caps) → Glyphs
+// rainbow.ts (all return plain text when caps.tier === 'none')
+paint(caps, text, { offset, step, sat, light }); hex(caps, '#ff6ec7', text); dim(caps, text); bold(caps, text)
 // banner.ts
-bannerFrame(caps, frame) → string[]            // the two Prism lines for one frame
-showBanner(caps) → Promise<void>               // animates when caps.animate, else prints once
-// theme.ts
-STOPS: string[]  // ['#ff6ec7','#7cf7ff','#b6ff6e','#ffd36e','#8a5cff','#ff9f6e']
-bullet(caps, i) → string                       // '◆' in STOPS[i % 6]
-section(caps, i, title) → string               // tinted section title for prompt groups
-// spinner.ts
+bannerFrame(caps, frame) → string[]; showBanner(caps) → Promise<void>
+// labels.ts: the words for every option; prompts, review and --help all read these
+FEATURES, TOOLING, CRATE_TOGGLES, LOGGING, ASYNC, HTTP, LICENSES, STACKS, KINDS, grouped(catalogue)
+// choose.ts
+pick(caps, { message, options: Item[], initialValue?, io? }) → value | cancel symbol
+pickMany(caps, { message, options: Item[], initialValues?, io? }) → values | cancel symbol
+// rail.ts
+text(caps, { message, placeholder?, defaultValue?, initialValue?, validate?, io? }) → string | cancel symbol
+note(caps, title, body); box(caps, title, lines); log(caps, lines); outro(caps, msg); cancel(caps, msg)
+tasks(caps, Task[]) → Promise<boolean>  // false as soon as a `required` task fails; later tasks don't run
+// motion.ts: one animated line per prompt
+live(caps, prompt, state); marker(caps, glyph, t); shimmer(caps, text, t); wave(caps, frame)
+cascade(caps, lines); sparkle(caps, prefix, text)
+// spinner.ts: non-interactive progress
 createSpinner(caps) → { start(msg), message(msg), stop(msg, ok = true) }
-// summary.ts
-renderSummary(caps, ctx, dests: string[], { dir, cargoChecked?: boolean|null, git?: boolean }) → string
 ```
 
 ## rustfmt-safe templates (learned the hard way)

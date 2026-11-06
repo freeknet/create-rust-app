@@ -101,11 +101,13 @@ export function cancel(caps: Caps, message: string) {
   write(`${r.bar()}\n${r.bar(r.g.barEnd)}  ${r.error(message)}\n\n`);
 }
 
-export interface Task { title: string; enabled?: boolean; run: (update: (msg: string) => void) => Promise<{ ok: boolean | null; message: string }> }
+/** `required`: if this step fails, later steps don't run. */
+export interface Task { title: string; enabled?: boolean; required?: boolean; run: (update: (msg: string) => void) => Promise<{ ok: boolean | null; message: string }> }
 
 /**
  * Run tasks one after another. Each shows a spinner line while running and settles into
- * `◇  message  0.4s` (or a warning mark when it failed or was skipped).
+ * `◇  message  0.4s` (or a warning mark when it failed or was skipped). Returns false, without
+ * running anything further, as soon as a `required` task fails.
  */
 export async function tasks(caps: Caps, list: Task[]) {
   const r = rail(caps);
@@ -135,7 +137,9 @@ export async function tasks(caps: Caps, list: Task[]) {
     const secs = dim(caps, `${((performance.now() - t0) / 1000).toFixed(1)}s`);
     const mark = result.ok === true ? r.done() : hex(caps, COLORS.warn, result.ok === null ? r.g.done : r.g.fail);
     write(`${caps.tty ? '\r\x1b[2K' : ''}${mark}  ${result.message}  ${secs}\n`);
+    if (t.required && result.ok !== true) return false;
   }
+  return true;
 }
 
 export { bold };

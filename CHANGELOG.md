@@ -7,8 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- An interactive run into an occupied folder carried on after the failed write: it ran `git init`,
+  committed what was there, printed success and exited 0. Occupied folders are now refused before
+  any question (unless `--force`), and a failed write stops the run with exit code 1.
+- Animated prompts no longer flicker.
+
 ### Changed
 
+- The classic Windows console gets 24-bit colour, block letters and a glyph set its font can draw,
+  instead of an ASCII fallback.
+- Motion: shimmering focused option, cycling marker, wave spinner, live file and crate counters,
+  cascading review, closing sparkle. Off for pipes, CI, `NO_COLOR` and 16-colour terminals.
+- `npm run build` starts from a clean `dist/`, so removed sources can't ship.
+- The Desktop app preset (`rustaman`) defaults to Rust 2024.
 - Interactive flow rebuilt: name → what you're building → a plain-words review with Create /
   Customize… / Cancel, instead of 20+ sequential questions. Every option shows a description;
   choices echo as short labels.
@@ -17,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Post-step defaults: `cargo fetch` on, `cargo check` off (`--cargo-check` to opt in) — a GUI
   project's check compiles eframe/wgpu and took minutes.
 - `--help` describes every `--with` / `--without` name; `--yes` prints the review instead of a file
-  tree. Moved to @clack/prompts 1.8 + @clack/core.
+  tree. Prompts are drawn on @clack/core; @clack/prompts is gone.
 
 ### Added
 

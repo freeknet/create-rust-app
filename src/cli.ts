@@ -7,7 +7,7 @@ import { parseArgv, optionalUi, renderHelp } from './args.ts';
 import { resolveAnswers } from './presets.ts';
 import { buildContext, validateName } from './context.ts';
 import { buildPlan } from './engine/plan.ts';
-import { writePlan } from './engine/write.ts';
+import { targetProblem, writePlan } from './engine/write.ts';
 import { initRepo } from './post/git.ts';
 import { cargoCheck } from './post/cargo.ts';
 import { openEditor } from './post/open.ts';
@@ -82,7 +82,7 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
   caps: Caps; answers: Answers; plan: PlanEntry[]; target: string; shown: string; force: boolean;
 }) {
   const { dim, paint } = await import('./ui/rainbow.ts');
-  const { box, log, outro, tasks } = await import('./ui/rail.ts');
+  const { box, cancel, log, outro, tasks } = await import('./ui/rail.ts');
   const { glyphs } = await import('./ui/glyphs.ts');
   const { cargoFetch } = await import('./post/cargo.ts');
   const { reproduceCommand } = await import('./reproduce.ts');
@@ -105,9 +105,9 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
       : { ok, message: ok ? `${label} done` : `${label} failed ${dim(caps, '(run it in the project for details)')}` };
   };
 
-  await tasks(caps, [
+  const finished = await tasks(caps, [
     {
-      title: `Writing ${plan.length} files`, run: async (update) => {
+      title: `Writing ${plan.length} files`, required: true, run: async (update) => {
         await writePlan(plan, target, { force, onFile: (dest, i, n) => update(`${String(i).padStart(String(n).length)}/${n}  ${dest}`) });
         return { ok: true, message: `Wrote ${plan.length} files to ${shown}` };
       },
@@ -123,6 +123,10 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
     { title: 'cargo fetch', enabled: answers.post.fetch, run: cargoTask('cargo fetch', cargoFetch) },
     { title: 'cargo check', enabled: answers.post.cargoCheck, run: cargoTask('cargo check', cargoCheck) },
   ]);
+  if (!finished) {
+    cancel(caps, 'Stopped: nothing after the failed step ran.');
+    return false;
+  }
   if (answers.post.open !== 'none') openEditor(target, answers.post.open);
 
   const cmds = nextCommands(answers, shown);
@@ -130,6 +134,7 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
   box(caps, 'next', cmds.map(([c, note]) => (note ? `${c.padEnd(pad)}${dim(caps, `# ${note}`)}` : c)));
   log(caps, [dim(caps, 'again without prompts:'), dim(caps, reproduceCommand(answers, shown === '.' ? '.' : undefined))]);
   await outro(caps, 'build something luminous');
+  return true;
 }
 
 /** An error that maps to a specific exit code (2 = bad arguments). */
@@ -184,6 +189,14 @@ export async function main(argv: string[]) {
       if (!validateName(base)) overrides.name = base;
     }
 
+    // Fail before asking anything: a folder we can't write into shouldn't cost the user a walkthrough.
+    const writes = !flags['dry-run'] && !flags.force;
+    const knownTarget = dir ?? overrides.name;
+    if (writes && knownTarget) {
+      const problem = targetProblem(resolve(knownTarget));
+      if (problem) throw new Error(problem);
+    }
+
     if (!quiet) {
       const banner = await optionalUi('banner');
       if (banner.showBanner) await banner.showBanner(caps);
@@ -194,7 +207,8 @@ export async function main(argv: string[]) {
     let answers: Answers;
     if (interactive) {
       const { ask } = await import('./prompts.ts');
-      answers = await ask(overrides, caps);
+      // With no directory given the target is ./<name>, so the name prompt checks that folder.
+      answers = await ask(overrides, caps, writes && !dir ? (name) => targetProblem(resolve(name)) : () => null);
     } else {
       answers = resolveAnswers(overrides.preset, overrides);
     }
@@ -219,8 +233,7 @@ export async function main(argv: string[]) {
 
     if (interactive) {
       // The review screen already confirmed; this is the run + finish.
-      await runInteractive({ caps, answers, plan, target, shown, force: Boolean(flags.force) });
-      return 0;
+      return (await runInteractive({ caps, answers, plan, target, shown, force: Boolean(flags.force) })) ? 0 : 1;
     }
 
     await writePlan(plan, target, { force: Boolean(flags.force) });

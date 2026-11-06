@@ -1,7 +1,7 @@
 # AGENTS.md
 
 `create-rust-app` is an `npx` scaffolder for Rust projects in the author's house style
-(taken from his `strobe` and `rustaman` projects). Strict TypeScript, compiled to ESM JavaScript for distribution.
+(taken from the `strobe` and `rustaman` projects). Strict TypeScript, compiled to ESM JavaScript for distribution.
 
 Read before doing anything:
 
@@ -9,9 +9,8 @@ Read before doing anything:
 2. [docs/CONTRACTS.md](docs/CONTRACTS.md) — module APIs, the Ctx shape, flags, tokens, template rules.
    Code against these. If you think one must change, say so in your final message; don't change it quietly.
 
-Reference projects (read-only, copy from them freely):
-`C:\Users\ADUPU\Documents\Development\rustaman` (single-crate GUI) and
-`C:\Users\ADUPU\Documents\Development\strobe` (workspace). Strip app-specific content
+Reference projects, usually checked out next to this repo (read-only, copy from them freely):
+`../rustaman` (single-crate GUI) and `../strobe` (workspace). Strip app-specific content
 (task-manager / visualizer features, decision IDs, backlog links); keep the patterns.
 
 ## Gates

@@ -54,7 +54,7 @@ a `cargo fetch` (and, with `--cargo-check`, a full `cargo check`), and you get a
 
 | Preset | What you get | Kind | Edition | Licence |
 |---|---|---|---|---|
-| `rustaman` | single-crate desktop GUI (Windows-first, builds on Linux) · eframe + wgpu · winres icon/manifest · screenshot example | `gui` | 2021 | MIT |
+| `rustaman` | single-crate desktop GUI (Windows-first, builds on Linux) · eframe + wgpu · winres icon/manifest · screenshot example | `gui` | 2024 | MIT |
 | `strobe` | cargo workspace desktop app · winit + glutin + egui_glow · `cargo xtask ci` / `changelog` | `workspace` | 2024 | MIT + Commons Clause |
 | `cli` | clap + anyhow + env_logger, full tooling | `cli` | 2024 | MIT |
 | `tui` | ratatui + crossterm terminal app | `tui` | 2024 | MIT |
