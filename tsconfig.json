@@ -23,7 +23,6 @@
                     "src/**/*.ts",
                     "bin/**/*.ts",
                     "scripts/**/*.ts",
-                    "tools/swarm/**/*.ts",
                     "templates/*/manifest.js",
                     "templates/*/deps.js"
                 ]

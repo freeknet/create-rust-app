@@ -235,33 +235,6 @@ hue math as the terminal banner, so the README, the social card and the CLI alwa
 Palette: prompt stops `#ff6ec7` `#ff9f6e` `#ffd36e` `#b6ff6e` `#7cf7ff` `#8a5cff` on `#0c0b12`.
 Wordmark hue runs 140° → 266° (green → cyan → violet), with each letter 9° on from the last.
 
-## How this repo is built
-
-The work is split into tasks in [`tools/swarm/tasks/`](tools/swarm/tasks), each owning a
-disjoint set of paths and declaring a gate command. `node tools/swarm/swarm.mjs run` fans them out to
-headless Codex workers, one git worktree and branch per task, and merges green work into
-`swarm/integration` for a human to review:
-
-- **Budget first.** Before launching, it reads the ChatGPT plan's usage windows through
-  `codex app-server` (`account/rateLimits/read`, which spends nothing). It refuses to start above
-  `--max-used` and stops launching workers while throttled. `swarm quota` prints the windows.
-- **Model per task.** The default is the workhorse tier (`gpt-6.1-sol`, medium effort). Tasks opt
-  into `gpt-6-luna` for docs, `gpt-6.1-terra` for mechanical work, or higher effort, through
-  frontmatter. Workers never inherit the frontier model from `~/.codex/config.toml`.
-- **Cache-friendly prompts.** Every worker gets the same preamble first, so the prompt cache serves
-  it to workers 2..N, and the task-specific part comes after.
-- **Trust, then verify.** Workers can't commit (`.git` is read-only to them). The orchestrator
-  checks that the diff stays inside the task's `owns` globs and runs the gate outside the sandbox.
-  If the gate fails, it resumes the worker's own thread, cheaply from cache, with the log tail, up
-  to `--repairs` times.
-- **Structured hand-back.** Each worker ends with a JSON report
-  (`tools/swarm/report.schema.json`): status, files, checks run, unfinished items, and proposed
-  contract changes.
-
-Workers code against [docs/CONTRACTS.md](docs/CONTRACTS.md), which is what keeps them from stepping
-on each other. `swarm prepare <id>` and `swarm finish <id>` let any other agent, or a person, work a
-task through the same ownership check, gate and merge.
-
 ## License
 
 [MIT](LICENSE) © 2026 Lawrence Norton

@@ -1,7 +1,5 @@
 node_modules/
 dist/
 .scratch/
-.swarm/
 *.tgz
 .npm-cache/
-.swarm-*.log

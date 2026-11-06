@@ -18,8 +18,7 @@
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "test": "node --test \"test/**/*.test.ts\"",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
-    "check": "node scripts/scaffold-check.ts",
-    "swarm": "node tools/swarm/swarm.ts"
+    "check": "node scripts/scaffold-check.ts"
   },
   "keywords": [
     "rust",

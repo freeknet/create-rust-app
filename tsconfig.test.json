@@ -1,5 +1,5 @@
 ﻿{
   "extends": "./tsconfig.json",
   "compilerOptions": { "noEmit": true },
-  "include": ["src/**/*.ts", "bin/**/*.ts", "scripts/**/*.ts", "tools/swarm/**/*.ts", "templates/*/manifest.js", "templates/*/deps.js", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "bin/**/*.ts", "scripts/**/*.ts", "templates/*/manifest.js", "templates/*/deps.js", "test/**/*.ts"]
 }
