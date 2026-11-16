@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, resolve, relative } from 'node:path';
 import { parseArgv, optionalUi, renderHelp } from './args.ts';
 import { resolveAnswers } from './presets.ts';
-import { buildContext, validateName } from './context.ts';
+import { buildContext, effectiveAnswers, validateName } from './context.ts';
 import { buildPlan } from './engine/plan.ts';
 import { targetProblem, writePlan } from './engine/write.ts';
 import { initRepo } from './post/git.ts';
@@ -222,7 +222,8 @@ export async function main(argv: string[]) {
 
     if (json) {
       if (!flags['dry-run']) await writePlan(plan, target, { force: Boolean(flags.force) });
-      console.log(JSON.stringify({ answers, files: dests }, null, 2));
+      // Report what was generated: options this kind never uses read false (#6).
+      console.log(JSON.stringify({ answers: effectiveAnswers(answers), files: dests }, null, 2));
       return 0;
     }
     if (flags['dry-run']) {

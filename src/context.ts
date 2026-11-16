@@ -27,10 +27,33 @@ const LICENSE_FLAG = {
   'MIT OR Apache-2.0': 'license_dual',
 };
 
+/** App features only a desktop GUI generates (kind `gui`, or the `workspace` app crate). */
+export const GUI_ONLY_FEATURES = ['themes', 'brand', 'motion', 'icons', 'winres', 'tray', 'singleInstance',
+  'commandPalette', 'screenshotExample'] as const satisfies readonly (keyof Answers['features'])[];
+
 /**
- * @param {any} a Answers
+ * The answers as they apply to this kind of project: options the kind never generates read
+ * `false`. Presets and defaults set desktop features for every kind (so switching to a GUI
+ * mid-flow keeps them); this is what the flags, and `--json`, report instead.
  */
-export function buildContext(a: Answers): Ctx {
+export function effectiveAnswers(a: Answers): Answers {
+  const out = structuredClone(a);
+  const hasGui = a.kind === 'gui' || a.kind === 'workspace';
+  if (!hasGui) {
+    for (const f of GUI_ONLY_FEATURES) out.features[f] = false;
+    out.tooling.unsafeCheck = false;
+  }
+  // The GUI kinds always ship a config file; the CLI only when serde is on to read it. A library
+  // leaves config to the app embedding it, and the TUI template has none.
+  if (!hasGui && !(a.kind === 'cli' && a.crates.serde)) out.features.config = false;
+  return out;
+}
+
+/**
+ * @param {any} raw Answers
+ */
+export function buildContext(raw: Answers): Ctx {
+  const a = effectiveAnswers(raw);
   const err = validateName(a.name);
   if (err) throw new Error(`invalid project name "${a.name}": ${err}`);
   const workspace = a.kind === 'workspace';
@@ -53,16 +76,10 @@ export function buildContext(a: Answers): Ctx {
   flags.add(`async_${a.crates.async}`);
   flags.add(`http_${a.crates.http}`);
   flags.add(`errors_${a.crates.errors}`);
+  // Options the kind never generates are already false here (see effectiveAnswers).
   for (const group of [a.crates, a.features, a.tooling]) {
     for (const [k, v] of Object.entries(group)) if (v === true) flags.add(k);
   }
-  // GUI-only features mean nothing without a GUI.
-  if (!hasGui) {
-    for (const f of ['themes', 'brand', 'motion', 'icons', 'winres', 'tray', 'singleInstance',
-      'commandPalette', 'screenshotExample', 'unsafeCheck']) flags.delete(f);
-  }
-  // A library has no user config file of its own; that belongs to the app embedding it.
-  if (a.kind === 'lib') flags.delete('config');
 
   const appCrate = workspace ? `${a.name}-app` : a.name;
   const year = String(new Date().getFullYear());

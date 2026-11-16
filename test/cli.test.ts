@@ -36,6 +36,22 @@ test('--json --dry-run prints answers and files only', () => {
   assert.ok(out.files.includes('Cargo.toml'), 'files include Cargo.toml');
 });
 
+test('--json reports the features a kind actually generates (#6)', () => {
+  for (const [preset, kind] of [['cli', 'cli'], ['tui', 'tui'], ['lib', 'lib']] as const) {
+    const r = run(['--preset', preset, '--name', 'x-' + preset, '--json', '--dry-run']);
+    assert.equal(r.status, 0, `exit 0, stderr: ${r.stderr}`);
+    const { answers, files } = JSON.parse(r.stdout);
+    assert.equal(answers.kind, kind, preset + ': kind');
+    for (const f of ['themes', 'brand', 'motion', 'icons', 'winres', 'tray', 'singleInstance', 'commandPalette', 'screenshotExample']) {
+      assert.equal(answers.features[f], false, `${preset}: ${f} is not generated`);
+    }
+    assert.equal(answers.tooling.unsafeCheck, false, preset + ': no unsafe check without a GUI');
+    assert.equal(answers.features.config, files.includes('src/config.rs'), preset + ': config matches the files');
+  }
+  const gui = JSON.parse(run(['--preset', 'rustaman', '--name', 'x-gui', '--json', '--dry-run']).stdout);
+  assert.equal(gui.answers.features.themes, true, 'desktop kinds keep their features');
+});
+
 test('unknown flag exits 2 with a suggestion', () => {
   const r = run(['--dyr-run']);
   assert.equal(r.status, 2, 'exit 2');

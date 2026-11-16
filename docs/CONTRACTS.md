@@ -52,7 +52,10 @@ test/*.test.ts             node --test
 
 ## Ctx = Answers + derived
 
-`buildContext(answers)` adds: `crate` (snake), `Name` (Pascal), `NAME` (SCREAMING),
+`buildContext(answers)` first applies `effectiveAnswers(answers)` (src/context.ts): options the kind
+never generates are set to `false` (desktop features and `unsafeCheck` without a GUI; `config` for
+`lib`, `tui`, and `cli` without serde). The Ctx and `--json` both carry these effective values.
+It then adds: `crate` (snake), `Name` (Pascal), `NAME` (SCREAMING),
 `year`, `appCrate` (workspace: `<name>-app`, else `<name>`), `flags: Set<string>`, `tokens`.
 
 ### Flags (used by directives and `when`)
