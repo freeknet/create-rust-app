@@ -43,7 +43,7 @@ pub const DEFAULT_TICK: Duration = Duration::from_millis(100);
 /// `about` comes from the `description` in `Cargo.toml`, so `--help` and
 /// the published crate metadata cannot drift apart.
 #[derive(clap::Parser, Debug)]
-#[command(name = "@@bin@@", version, about)]
+#[command(name = "@@bin@@", version, about, long_about = None)]
 struct Cli {
     /// Milliseconds between animation ticks.
     #[arg(
