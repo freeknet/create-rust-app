@@ -68,3 +68,13 @@ test('context, tokens and paths', () => {
 test('every preset builds a context', () => {
   for (const p of Object.keys(PRESETS)) assert.ok(buildContext(resolveAnswers(p, { name: 'x-y' })).flags.size > 0, p);
 });
+
+test('generated README links back to this repository (package.json repository.url)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  const repo = String(pkg.repository.url).replace(/^git\+/, '').replace(/\.git$/, '');
+  const readme = await readFile(new URL('../templates/base/files/README.md', import.meta.url), 'utf8');
+  const links = [...readme.matchAll(/https:\/\/github\.com\/[\w.-]+\/create-rust-app\b/g)].map((m) => m[0]);
+  assert.ok(links.length > 0, 'the footer links to create-rust-app');
+  for (const link of links) assert.equal(link, repo, 'README template link matches package.json');
+});

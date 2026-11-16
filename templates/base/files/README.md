@@ -256,4 +256,4 @@ conditions.
 
 ---
 
-<sub>Scaffolded with [create-rust-app](https://github.com/lnorton89/create-rust-app).</sub>
+<sub>Scaffolded with [create-rust-app](https://github.com/freeknet/create-rust-app).</sub>
