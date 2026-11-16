@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { chmodSync, existsSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -69,4 +69,31 @@ test('--help and --version', () => {
 test('fileTree renders nested dests', () => {
   const tree = fileTree(['Cargo.toml', 'src/main.rs', 'src/lib.rs', '.github/workflows/ci.yml'], 2, false);
   assert.equal(tree, ['|-- .github/', '|   `-- workflows/', '|-- src/', '|   |-- lib.rs', '|   `-- main.rs', '`-- Cargo.toml'].join('\n'));
+});
+
+test('Cargo.lock from cargo fetch is part of the first commit (#11)', { skip: process.platform === 'win32' && 'shell-script cargo shim' }, async (t) => {
+  if (spawnSync('git', ['--version']).status !== 0) { t.skip('git not on PATH'); return; }
+  const base = await mkdtemp(join(tmpdir(), 'cra-lock-'));
+  try {
+    // A stand-in cargo: `fetch` writes Cargo.lock, as the real one does. No rustup on this PATH
+    // means "can't tell", so the toolchain check lets it run.
+    const bin = join(base, 'bin');
+    await import('node:fs/promises').then((fs) => fs.mkdir(bin));
+    writeFileSync(join(bin, 'cargo'), '#!/bin/sh\n[ "$1" = fetch ] && echo "# lock" > Cargo.lock\nexit 0\n');
+    chmodSync(join(bin, 'cargo'), 0o755);
+    const gitDir = spawnSync('sh', ['-c', 'dirname "$(command -v git)"'], { encoding: 'utf8' }).stdout.trim();
+    const dir = join(base, 'demo');
+    const r = spawnSync(process.execPath, [BIN, dir, '--preset', 'minimal', '--yes', '--quiet'], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, NO_COLOR: '1', PATH: `${bin}:${gitDir}`, GIT_CONFIG_GLOBAL: '/dev/null' },
+    });
+    assert.equal(r.status, 0, `exit 0, stderr: ${r.stderr}`);
+    assert.ok(existsSync(join(dir, 'Cargo.lock')), 'cargo fetch ran');
+    const tracked = spawnSync('git', ['ls-files', 'Cargo.lock'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
+    assert.equal(tracked, 'Cargo.lock', 'Cargo.lock is committed');
+    const dirty = spawnSync('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' }).stdout;
+    assert.equal(dirty, '', 'the tree is clean straight after scaffolding');
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
 });

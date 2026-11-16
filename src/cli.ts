@@ -112,6 +112,8 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
         return { ok: true, message: `Wrote ${plan.length} files to ${shown}` };
       },
     },
+    // Fetch first: it writes Cargo.lock, which belongs in the first commit (#11).
+    { title: 'cargo fetch', enabled: answers.post.fetch, run: cargoTask('cargo fetch', cargoFetch) },
     {
       title: 'git init', enabled: answers.post.git, run: async () => {
         const r = initRepo(target, answers);
@@ -120,7 +122,6 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
           : { ok: r.ok, message: `git ${r.ok === false ? 'failed' : 'skipped'} ${dim(caps, `(${r.reason ?? ''})`)}` };
       },
     },
-    { title: 'cargo fetch', enabled: answers.post.fetch, run: cargoTask('cargo fetch', cargoFetch) },
     { title: 'cargo check', enabled: answers.post.cargoCheck, run: cargoTask('cargo check', cargoCheck) },
   ]);
   if (!finished) {
@@ -248,14 +249,7 @@ export async function main(argv: string[]) {
         message() {},
         stop: (/** @type {string} */ m: string) => console.log(m),
       };
-    /** @type {boolean | undefined} */
-    let gitDone: boolean | undefined;
-    if (answers.post.git) {
-      const r = initRepo(target, answers);
-      gitDone = r.ok === true;
-      if (r.ok === false) log(`warning: ${r.reason}`);
-      else if (r.ok === null) log(`git skipped: ${r.reason}`);
-    }
+    // Fetch before git: cargo fetch writes Cargo.lock, which belongs in the first commit (#11).
     if (answers.post.fetch) {
       let hint = '';
       spinner.start('cargo fetch');
@@ -267,6 +261,14 @@ export async function main(argv: string[]) {
       });
       if (fetched === null) spinner.stop(`cargo fetch skipped${hint ? ` (${hint})` : ''}`, true);
       else spinner.stop(fetched ? 'cargo fetch done' : 'cargo fetch failed (run it in the project for details)', fetched);
+    }
+    /** @type {boolean | undefined} */
+    let gitDone: boolean | undefined;
+    if (answers.post.git) {
+      const r = initRepo(target, answers);
+      gitDone = r.ok === true;
+      if (r.ok === false) log(`warning: ${r.reason}`);
+      else if (r.ok === null) log(`git skipped: ${r.reason}`);
     }
     /** @type {boolean | null} */
     let cargoChecked: boolean | null = null;

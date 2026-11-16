@@ -195,9 +195,9 @@ all tooling), `tui` (ratatui + crossterm), `lib` (thiserror, no bin, docs.rs met
   deny.toml are composed in code (`src/gen/`), not templated.
 - A target folder with content is refused before any question unless `--force` is passed. In the run,
   writing is a required step: if it fails, nothing after it runs.
-- Post-steps: `git init -b main` + add + commit; `cargo fetch` by default; opt-in `cargo check
-  --all-targets`; a `rustup toolchain install <pin>` hint when the pin is missing; `--open` spawns the
-  editor detached.
+- Post-steps: `cargo fetch` by default (first, so `Cargo.lock` lands in the first commit);
+  `git init -b main` + add + commit; opt-in `cargo check --all-targets`; a
+  `rustup toolchain install <pin>` hint when the pin is missing; `--open` spawns the editor detached.
 
 ## 4. UX
 
