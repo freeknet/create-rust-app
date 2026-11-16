@@ -23,13 +23,25 @@ releases, and a house style that checks itself.**
 ## Quick start
 
 ```bash
-npx create-rust-app            # interactive
-npm create rust-app            # same thing, npm-init style
+npx github:freeknet/create-rust-app            # interactive
 
-npx create-rust-app my-tool --preset cli -y     # no questions asked
-npx create-rust-app my-gui --preset rustaman --with tray,singleInstance
-npx create-rust-app --preset lib --dry-run --json  # see the plan, write nothing
+npx github:freeknet/create-rust-app my-tool --preset cli -y     # no questions asked
+npx github:freeknet/create-rust-app my-tool --preset cli --with subcommands --bin mt -y
+npx github:freeknet/create-rust-app my-gui --preset rustaman --with tray,singleInstance
+npx github:freeknet/create-rust-app --preset lib --dry-run --json  # see the plan, write nothing
 ```
+
+> **Not on npm yet.** `npx create-rust-app` and `npm create rust-app` don't work: this project
+> hasn't published to npm, and the `create-rust-app` name there belonged to an unrelated package
+> that was unpublished in 2025. `npx github:freeknet/create-rust-app` installs straight from this
+> repository (npm clones and builds it the first time, so the first run takes a little longer).
+> Or run it from a clone:
+>
+> ```bash
+> git clone https://github.com/freeknet/create-rust-app && cd create-rust-app
+> npm ci                                       # also builds dist/
+> node dist/bin/create-rust-app.js my-tool --preset cli -y
+> ```
 
 Then:
 
@@ -61,8 +73,8 @@ a `cargo fetch` (and, with `--cargo-check`, a full `cargo check`), and you get a
 | `lib` | publishable crate · thiserror · docs.rs ready, no binary | `lib` | 2024 | MIT OR Apache-2.0 |
 | `minimal` | Cargo.toml + lints + main + CI, nothing else | `cli` | 2024 | MIT |
 
-With no preset you get the defaults: a single-crate eframe GUI, edition 2024, MSRV 1.98,
-toolchain pinned to 1.99.1, every tooling option on. Presets are just partial answers layered on
+With no preset (or `--preset custom`, which means the same) you get the defaults: a single-crate
+eframe GUI, edition 2024, MSRV 1.98, toolchain pinned to 1.99.1, every tooling option on. Presets are just partial answers layered on
 those defaults (see [`src/presets.ts`](src/presets.ts)); any flag below overrides them.
 
 ## Flags
@@ -75,7 +87,8 @@ create-rust-app [dir] [options]
 |---|---|
 | `[dir]` | Target directory (defaults to the project name) |
 | `--name <kebab>` | Crate / project name, `^[a-z][a-z0-9-]*$` |
-| `--preset <p>` | `rustaman` `strobe` `cli` `tui` `lib` `minimal` |
+| `--bin <name>` | Executable name when it differs from the crate (writes `[[bin]]`; clap, README and release follow it) |
+| `--preset <p>` | `rustaman` `strobe` `cli` `tui` `lib` `minimal`, or `custom` for no preset (the defaults) |
 | `--kind <k>` | `cli` `gui` `tui` `lib` `workspace` |
 | `--gui <stack>` | `eframe` (wgpu) or `winit-glow` (winit + glutin + egui_glow) |
 | `--edition <e>` | `2024` or `2021` |
@@ -85,8 +98,9 @@ create-rust-app [dir] [options]
 | `--author <name>` | Author for Cargo.toml, LICENSE, headers |
 | `--github <user>` | GitHub handle for CODEOWNERS and repository links |
 | `--accent <#hex>` | Accent colour for GUI themes (default `#00e5ff`) |
-| `--with a,b` | Turn on features / tooling, e.g. `--with tray,commandPalette` |
+| `--with a,b` | Turn on features / tooling, e.g. `--with tray,commandPalette`, or `--with subcommands` for a CLI built on a clap `Subcommand` enum |
 | `--without a,b` | Turn them off, e.g. `--without release,dependabot` |
+| `--set <key.path=value>` | Set any answer directly (repeatable), e.g. `--set tagline="Fast grep"`, `--set crates.async=tokio`. The only way to set `tagline` / `displayName` without prompts. `true`/`false` become booleans |
 | `-y`, `--yes` | Accept defaults for anything not given; no prompts |
 | `--no-git` | Skip `git init -b main` and the initial commit |
 | `--no-fetch` | Skip `cargo fetch` after writing (on by default: seconds, not minutes) |
@@ -100,7 +114,8 @@ create-rust-app [dir] [options]
 | `--force` | Write into a non-empty directory |
 | `--help`, `--version` | The usual |
 
-A non-TTY stdin implies `--yes`.
+A non-TTY stdin implies `--yes`. Answer flags apply left to right, so a later `--set` or
+`--without` overrides an earlier one. `--help` lists every `--with` / `--without` name.
 
 ## What you get
 

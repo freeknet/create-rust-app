@@ -6,11 +6,18 @@ import { resolveAnswers } from './presets.ts';
 import { effectiveAnswers } from './context.ts';
 import type { Answers } from './types.ts';
 
+/**
+ * How to run the tool. The `create-rust-app` name on npm is not published by this project (an
+ * unrelated package of that name was unpublished in 2025), so this runs it from GitHub, which npm
+ * builds through the `prepare` script. Switch to `npx create-rust-app` once it is on npm.
+ */
+export const RUN_COMMAND = 'npx github:freeknet/create-rust-app';
+
 const quote = (v: string) => (/^[\w.@/:+-]+$/.test(v) ? v : `"${v.replace(/"/g, '\\"')}"`);
 
 export function reproduceCommand(a: Answers, dir?: string): string {
   const base = resolveAnswers(a.preset, { name: a.name });
-  const parts = ['npx create-rust-app', quote(dir ?? a.name)];
+  const parts = [RUN_COMMAND, quote(dir ?? a.name)];
   if (a.preset) parts.push('--preset', a.preset);
   else if (a.kind !== base.kind) parts.push('--kind', a.kind);
 

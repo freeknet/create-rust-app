@@ -9,7 +9,7 @@ import { STOPS, bullet, section } from '../src/ui/theme.ts';
 import { createSpinner } from '../src/ui/spinner.ts';
 import { reviewLines } from '../src/prompts.ts';
 import { nextCommands } from '../src/cli.ts';
-import { reproduceCommand } from '../src/reproduce.ts';
+import { RUN_COMMAND, reproduceCommand } from '../src/reproduce.ts';
 import { parseArgv } from '../src/args.ts';
 import { buildContext } from '../src/context.ts';
 import { resolveAnswers } from '../src/presets.ts';
@@ -149,8 +149,8 @@ test('the reproduce command round-trips through the argument parser', () => {
   custom.bin = 'nd';
   custom.features.subcommands = true;
   const cmd = reproduceCommand(custom);
-  assert.ok(cmd.startsWith('npx create-rust-app neon-dash --preset cli'), cmd);
-  const argv = cmd.replace(/^npx create-rust-app /, '').split(' ');
+  assert.ok(cmd.startsWith(`${RUN_COMMAND} neon-dash --preset cli`), cmd);
+  const argv = cmd.slice(RUN_COMMAND.length + 1).split(' ');
   const { overrides } = parseArgv(argv);
   const back = resolveAnswers(overrides.preset ?? null, overrides);
   assert.deepEqual(back.crates, custom.crates, 'crates survive the round trip');
@@ -159,7 +159,7 @@ test('the reproduce command round-trips through the argument parser', () => {
   assert.equal(back.post.git, false);
   assert.equal(back.bin, 'nd', '--bin survives the round trip');
   assert.equal(back.features.subcommands, true, 'subcommands survive the round trip');
-  assert.equal(reproduceCommand(resolveAnswers('cli', { name: 'x' })), 'npx create-rust-app x --preset cli -y', 'defaults stay one short line');
+  assert.equal(reproduceCommand(resolveAnswers('cli', { name: 'x' })), `${RUN_COMMAND} x --preset cli -y`, 'defaults stay one short line');
 });
 
 test('ASCII fallback has no non-ASCII when unicode=false', () => {

@@ -17,6 +17,7 @@
     "build": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\" && tsc -p .",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "test": "node --test --test-force-exit \"test/**/*.test.ts\"",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "check": "node scripts/scaffold-check.ts"
   },
