@@ -170,6 +170,7 @@ debug = "line-tables-only"
 | gui stack | `eframe` ★ (rustaman: eframe + wgpu) / `winit-glow` (strobe) |
 | crates | errors: anyhow ★ (+ thiserror ★ for lib/workspace); logging: `log` ★gui / `env_logger` ★cli / `tracing`; serde+toml ★; async: none ★ / tokio; http: none ★ / ureq / reqwest; sqlite: off ★ / rusqlite bundled; clap ★ (everything but lib) |
 | features (gui) | themes ★, brand ★, motion ★, icons ★, config ★, winres ★ (icon+manifest+version), tray, singleInstance, commandPalette, screenshotExample |
+| features (cli) | subcommands (clap `Subcommand` enum, `tool <command> …`, replaces the greeting demo; needs clap) |
 | tooling | ci ★, release ★, cargoDeny ★, dependabot ★, toolchainPin ★, agentDocs ★ (AGENTS.md + CLAUDE.md), headerCheck ★, unsafeCheck ★ (gui), changelogGen ★, issueTemplates ★, codeowners ★, securityMd ★ |
 | theme | accent ★`#00e5ff` |
 | post | git ★ (init + initial commit `feat: scaffold <name> with create-rust-app`), cargoCheck ★ if cargo is on PATH, open: none ★ / code / cursor |

@@ -20,7 +20,12 @@ export const FEATURES: Record<FeatureKey, Choice> = {
   commandPalette: { label: 'Command palette', hint: 'Ctrl+K fuzzy search over every action', group: 'behaviour' },
   winres: { label: 'Windows resources', hint: 'exe icon, manifest, version info', group: 'packaging' },
   screenshotExample: { label: 'Screenshot example', hint: 'renders the UI headlessly to PNG', group: 'packaging' },
+  subcommands: { label: 'Subcommands', hint: 'clap subcommands instead of the greeting demo', group: 'cli' },
 };
+
+/** The desktop app features: every feature but the CLI's command-line shape. */
+export const DESKTOP = Object.fromEntries(Object.entries(FEATURES).filter(([, c]) => c.group !== 'cli')) as
+  Record<Exclude<FeatureKey, 'subcommands'>, Choice>;
 
 export const TOOLING: Record<ToolingKey, Choice> = {
   ci: { label: 'CI', hint: 'fmt · clippy -D warnings · tests on Windows + Linux', group: 'github' },

@@ -135,6 +135,8 @@ test('next commands fit the kind', () => {
   assert.deepEqual(flat('lib', '.'), ['cargo test', 'cargo clippy --all-targets -- -D warnings'], 'lib: test, no cd into "."');
   assert.ok(flat('gui').includes('cargo run') && flat('gui')[0] === 'cd demo');
   assert.ok(flat('workspace').includes('cargo xtask ci'), 'workspace uses xtask');
+  const sub = resolveAnswers('cli', { name: 'demo', features: { subcommands: true } });
+  assert.ok(nextCommands(sub, 'demo').some(([c]) => c === 'cargo run -- --help'), 'a bare run of a subcommand CLI only prints usage');
 });
 
 test('the reproduce command round-trips through the argument parser', () => {

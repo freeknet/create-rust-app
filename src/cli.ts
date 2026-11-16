@@ -71,6 +71,7 @@ export function nextCommands(a: Answers, shown: string): [string, string][] {
   const out: [string, string][] = [];
   if (shown !== '.') out.push([`cd ${shown}`, '']);
   if (a.kind === 'lib') out.push(['cargo test', 'unit + doc tests']);
+  else if (effectiveAnswers(a).features.subcommands) out.push(['cargo run -- --help', 'lists the subcommands']);
   else out.push(['cargo run', a.kind === 'gui' || a.kind === 'workspace' ? 'first build takes a minute' : '']);
   if (a.kind === 'workspace') out.push(['cargo xtask ci', 'the same gate CI runs']);
   else out.push(['cargo clippy --all-targets -- -D warnings', 'the lint gate CI runs']);
