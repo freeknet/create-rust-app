@@ -78,3 +78,20 @@ test('generated README links back to this repository (package.json repository.ur
   assert.ok(links.length > 0, 'the footer links to create-rust-app');
   for (const link of links) assert.equal(link, repo, 'README template link matches package.json');
 });
+
+test('template deps.js never pins a different version of a base crate', async () => {
+  const { baseDeps, collectDeps } = await import('../src/gen/deps.ts');
+  const combos = [
+    ['cli', { crates: { http: 'reqwest', async: 'none', sqlite: true } }],
+    ['cli', { crates: { http: 'ureq', async: 'tokio' } }],
+    ['tui', {}], ['lib', {}], ['rustaman', {}], ['strobe', {}],
+  ] as const;
+  for (const [preset, extra] of combos) {
+    const ctx = buildContext(resolveAnswers(preset, { name: 'v-' + preset, ...extra }));
+    const base = new Map(baseDeps(ctx).map((d) => [d.name, d.version]));
+    for (const dep of await collectDeps(ctx)) {
+      const want = base.get(dep.name);
+      if (want && (dep.crate ?? 'app') === 'app') assert.equal(dep.version, want, `${preset}: ${dep.name} keeps the base version`);
+    }
+  }
+});
