@@ -188,7 +188,7 @@ all tooling), `tui` (ratatui + crossterm), `lib` (thiserror, no bin, docs.rs met
 - Runtime deps: `@clack/core` (prompt state machines and key handling) and `picocolors`. Everything
   else is hand-rolled: arg parsing with `node:util` `parseArgs`, gradients in `src/ui/rainbow.ts`, the
   banner in `src/ui/banner.ts`, rendering in `src/ui/{rail,choose,motion}.ts`.
-- Flags: `create-rust-app [dir] --name --preset <p> --kind --gui <eframe|winit-glow> --edition --msrv
+- Flags: `create-rust-app [dir] --name --bin --preset <p> --kind --gui <eframe|winit-glow> --edition --msrv
   --toolchain --license --author --github --accent --with a,b --without a,b --set key.path=value
   --yes/-y --no-git --no-fetch --cargo-check --no-cargo-check --open <code|cursor> --dry-run --json
   --no-color --quiet --force --help --version`. Non-TTY implies `--yes`.

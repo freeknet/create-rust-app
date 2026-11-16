@@ -43,7 +43,7 @@ const DEFAULT_GREETING: &str = "Hello";
 /// `about` comes from the `description` in `Cargo.toml`, so `--help` and
 /// the published crate metadata cannot drift apart.
 #[derive(clap::Parser, Debug)]
-#[command(name = "@@name@@", version, about)]
+#[command(name = "@@bin@@", version, about)]
 pub(crate) struct Cli {
     /// Who to greet. Overrides the saved preference for this run.
     #[arg(long, value_name = "NAME")]

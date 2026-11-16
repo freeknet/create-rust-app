@@ -12,6 +12,14 @@ export function validateName(name: string) {
   return null;
 }
 
+/** A binary name: what users type, so the same rules as a crate name plus underscores. */
+export function validateBin(bin: string) {
+  if (!/^[a-z][a-z0-9_-]*$/.test(bin)) return 'Use lowercase letters, digits, dashes and underscores, starting with a letter.';
+  // Cargo refuses these as target names: they collide with directories under target/.
+  if (['deps', 'examples', 'build', 'incremental'].includes(bin)) return `"${bin}" is reserved by Cargo.`;
+  return null;
+}
+
 /** @param {string} s */
 export const toSnake = (s: string) => s.replace(/-/g, '_');
 /** @param {string} s */
@@ -48,6 +56,8 @@ export function effectiveAnswers(a: Answers): Answers {
   if (!hasGui && !(a.kind === 'cli' && a.crates.serde)) out.features.config = false;
   // Subcommands shape a clap command line, so they need the cli kind with clap.
   if (a.kind !== 'cli' || !a.crates.clap) out.features.subcommands = false;
+  // A library has no binary, and a binary named like its crate needs no [[bin]] table.
+  if (a.kind === 'lib' || a.bin === (a.kind === 'workspace' ? `${a.name}-app` : a.name)) out.bin = '';
   return out;
 }
 
@@ -58,6 +68,8 @@ export function buildContext(raw: Answers): Ctx {
   const a = effectiveAnswers(raw);
   const err = validateName(a.name);
   if (err) throw new Error(`invalid project name "${a.name}": ${err}`);
+  const binErr = a.bin ? validateBin(a.bin) : null;
+  if (binErr) throw new Error(`invalid binary name "${a.bin}": ${binErr}`);
   const workspace = a.kind === 'workspace';
   const hasGui = a.kind === 'gui' || workspace;
 
@@ -71,6 +83,7 @@ export function buildContext(raw: Answers): Ctx {
     flags.add(`gui_${a.guiStack.replace(/-/g, '_')}`);
   }
   if (a.kind !== 'lib') flags.add('has_bin');
+  if (a.bin) flags.add('custom_bin');
   const lf = LICENSE_FLAG[/** @type {keyof typeof LICENSE_FLAG} */ (a.license as keyof typeof LICENSE_FLAG)];
   if (!lf) throw new Error(`unknown license ${a.license}`);
   flags.add(lf);
@@ -88,6 +101,9 @@ export function buildContext(raw: Answers): Ctx {
   /** @type {Record<string,string>} */
   const tokens: Record<TokenKey,string> = {
     name: a.name,
+    // The command's name. Without --bin a workspace's executable file is still <name>-app
+    // (templates switch on the custom_bin flag where the file name matters).
+    bin: a.bin || a.name,
     crate: toSnake(a.name),
     Name: toPascal(a.name),
     NAME: toScreaming(a.name),

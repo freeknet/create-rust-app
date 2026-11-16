@@ -11,7 +11,7 @@ import { isCancel } from '@clack/core';
 import { cancel, note, text } from './ui/rail.ts';
 import { glyphs } from './ui/glyphs.ts';
 import { PRESETS, resolveAnswers } from './presets.ts';
-import { validateName } from './context.ts';
+import { effectiveAnswers, validateBin, validateName } from './context.ts';
 import { dim, hex, bold } from './ui/rainbow.ts';
 import { pick, pickMany } from './ui/choose.ts';
 import type { Item } from './ui/choose.ts';
@@ -93,7 +93,8 @@ export function reviewLines(caps: Caps, a: Answers): { title: string; body: stri
     .flatMap(([name, color, items]) => wrap(items.join(sep), max).map((line, i) =>
       `${i === 0 ? hex(caps, color, name.padEnd(label)) : ' '.repeat(label)}${line}`))
     .join('\n');
-  const title = `${bold(caps, a.name)}${dim(caps, `${sep}${KINDS[a.kind]}${sep}Rust ${a.edition}${sep}${LICENSES[a.license].label}`)}`;
+  const bin = effectiveAnswers(a).bin;
+  const title = `${bold(caps, a.name)}${dim(caps, `${bin ? ` (runs as ${bin})` : ''}${sep}${KINDS[a.kind]}${sep}Rust ${a.edition}${sep}${LICENSES[a.license].label}`)}`;
   return { title, body };
 }
 
@@ -154,7 +155,7 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
     { value: 'tooling', label: 'Tooling', hint: 'CI, releases, guardrails, docs' },
     { value: 'rust', label: 'Licence + Rust', hint: `${LICENSES[a.license].label} · edition ${a.edition} · MSRV ${a.msrv} · pin ${a.toolchain}` },
     { value: 'after', label: 'After creating', hint: 'git, cargo fetch / check, open editor' },
-    { value: 'details', label: 'Name + tagline', hint: `${a.name} — ${a.tagline}` },
+    { value: 'details', label: a.kind === 'lib' ? 'Name + tagline' : 'Name, command + tagline', hint: `${a.name}${effectiveAnswers(a).bin ? ` (runs as ${a.bin})` : ''} — ${a.tagline}` },
     { value: 'preset', label: 'Start over from a preset', hint: 'resets everything else' },
     { value: 'back', label: 'Back to review', hint: '' },
   ]);
@@ -240,6 +241,15 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
 
   if (which === 'details') {
     out.name = got(await text(caps, { message: 'Project name', initialValue: out.name, validate: (v) => validateName(v ?? '') ?? targetCheck(v ?? '') ?? undefined }));
+    if (out.kind !== 'lib') {
+      // The executable is named after its crate unless this differs; then a [[bin]] table names it.
+      const crateBin = out.kind === 'workspace' ? `${out.name}-app` : out.name;
+      const bin = got(await text(caps, {
+        message: 'Command name (what users type)', initialValue: out.bin || crateBin, placeholder: crateBin,
+        validate: (v) => (v ? validateBin(v) ?? undefined : undefined),
+      }));
+      out.bin = bin === crateBin ? '' : bin;
+    }
     out.tagline = got(await text(caps, { message: 'One-line description', initialValue: out.tagline, placeholder: 'A Rust app.' }));
   }
   return out;

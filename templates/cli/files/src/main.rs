@@ -6,7 +6,7 @@
 // Dependencies: @@crate@@ (the library), anyhow
 // ============================================================================
 
-//! Entry point for `@@name@@`.
+//! Entry point for `@@bin@@`.
 //!
 //! Deliberately thin. Everything that can be tested lives in the library
 //! (see `src/lib.rs`); this file only connects it to the process. An `Err`

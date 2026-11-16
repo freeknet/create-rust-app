@@ -1,6 +1,8 @@
 /** User choices accepted by the scaffolder. */
 export interface Answers {
   name: string;
+  /** Executable name when it differs from the crate (`[[bin]]`); '' = the crate name. */
+  bin: string;
   displayName: string;
   tagline: string;
   author: string;
@@ -36,7 +38,7 @@ export type PartialAnswers = {
   [K in keyof Answers]?: Answers[K] extends object ? Partial<Answers[K]> : Answers[K];
 };
 
-export type TokenKey = 'name' | 'crate' | 'Name' | 'NAME' | 'appCrate' | 'appCrateSnake'
+export type TokenKey = 'name' | 'bin' | 'crate' | 'Name' | 'NAME' | 'appCrate' | 'appCrateSnake'
   | 'displayName' | 'tagline' | 'author' | 'github' | 'email' | 'year' | 'license'
   | 'edition' | 'msrv' | 'toolchain' | 'accent';
 

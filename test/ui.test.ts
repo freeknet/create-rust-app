@@ -146,6 +146,8 @@ test('the reproduce command round-trips through the argument parser', () => {
   custom.tooling.release = false;
   custom.edition = '2021';
   custom.post.git = false;
+  custom.bin = 'nd';
+  custom.features.subcommands = true;
   const cmd = reproduceCommand(custom);
   assert.ok(cmd.startsWith('npx create-rust-app neon-dash --preset cli'), cmd);
   const argv = cmd.replace(/^npx create-rust-app /, '').split(' ');
@@ -155,6 +157,8 @@ test('the reproduce command round-trips through the argument parser', () => {
   assert.deepEqual(back.tooling, custom.tooling, 'tooling survives the round trip');
   assert.equal(back.edition, '2021');
   assert.equal(back.post.git, false);
+  assert.equal(back.bin, 'nd', '--bin survives the round trip');
+  assert.equal(back.features.subcommands, true, 'subcommands survive the round trip');
   assert.equal(reproduceCommand(resolveAnswers('cli', { name: 'x' })), 'npx create-rust-app x --preset cli -y', 'defaults stay one short line');
 });
 

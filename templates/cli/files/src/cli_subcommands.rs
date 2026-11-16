@@ -45,7 +45,7 @@ const DEFAULT_GREETING: &str = "Hello";
 /// the published crate metadata cannot drift apart. A subcommand is
 /// required: a bare run prints usage and exits 2.
 #[derive(clap::Parser, Debug)]
-#[command(name = "@@name@@", version, about)]
+#[command(name = "@@bin@@", version, about)]
 pub(crate) struct Cli {
     /// What to do.
     #[command(subcommand)]

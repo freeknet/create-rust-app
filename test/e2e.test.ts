@@ -125,3 +125,32 @@ test('--with subcommands swaps in the subcommand CLI, only for the cli kind with
   const tui = await plan('tui', { features: { subcommands: true } });
   assert.ok(!tui.some((e: PlanEntry) => e.dest === 'tests/cli.rs'), 'other kinds are untouched');
 });
+
+test('--bin names the executable everywhere it is named, and only there (#8)', async () => {
+  const plan = async (preset: string, extra: Record<string, unknown>) =>
+    buildPlan(buildContext(resolveAnswers(preset, { name: 'long-name', ...extra })));
+  const text = (entries: PlanEntry[], dest: string) => {
+    const e = entries.find((x: PlanEntry) => x.dest === dest);
+    return e && 'content' in e ? e.content : '';
+  };
+  const cli = await plan('cli', { bin: 'ln' });
+  assert.match(text(cli, 'Cargo.toml'), /\n\[\[bin\]\]\nname = "ln"\npath = "src\/main\.rs"\n/, '[[bin]] table');
+  assert.match(text(cli, 'Cargo.toml'), /^name = "long-name"$/m, 'the package keeps its name');
+  assert.match(text(cli, 'src/cli.rs'), /#\[command\(name = "ln"/, 'clap shows the command name');
+  assert.match(text(cli, 'README.md'), /puts `ln` on your PATH/, 'README');
+  assert.match(text(cli, '.github/workflows/release.yml'), /release\/ln\.exe/, 'release packages the right exe');
+  assert.match(text(cli, 'src/config.rs'), /join\("long-name"\)/, 'the config dir stays the app name');
+
+  const ws = await plan('strobe', { bin: 'ln' });
+  assert.match(text(ws, 'crates/long-name-app/Cargo.toml'), /\[\[bin\]\]\nname = "ln"/, 'workspace app crate gets [[bin]]');
+  assert.doesNotMatch(text(ws, 'crates/xtask/Cargo.toml'), /\[\[bin\]\]/, 'xtask does not');
+  assert.match(text(ws, '.github/workflows/release.yml'), /release\/ln\.exe/, 'workspace release');
+
+  const plainWs = await plan('strobe', {});
+  assert.match(text(plainWs, '.github/workflows/release.yml'), /release\/long-name-app\.exe/, 'default workspace exe is the app crate');
+  assert.doesNotMatch(text(plainWs, 'crates/long-name-app/Cargo.toml'), /\[\[bin\]\]/, 'no table by default');
+  for (const [preset, bin] of [['cli', 'long-name'], ['lib', 'ln'], ['strobe', 'long-name-app']] as const) {
+    const p = await plan(preset, { bin });
+    assert.ok(!p.some((e: PlanEntry) => 'content' in e && /\[\[bin\]\]/.test(e.content)), `${preset} --bin ${bin}: no [[bin]] needed`);
+  }
+});

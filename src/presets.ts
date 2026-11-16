@@ -3,6 +3,7 @@ import type { Answers, PartialAnswers } from './types.ts';
 
 export const DEFAULTS: Answers = Object.freeze<Answers>({
   name: 'my-app',
+  bin: '',
   displayName: '',
   tagline: 'A Rust app.',
   author: 'Lawrence Norton',

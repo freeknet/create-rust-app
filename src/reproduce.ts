@@ -3,6 +3,7 @@
  * It lists only what differs from the chosen preset, so the common case stays one short line.
  */
 import { resolveAnswers } from './presets.ts';
+import { effectiveAnswers } from './context.ts';
 import type { Answers } from './types.ts';
 
 const quote = (v: string) => (/^[\w.@/:+-]+$/.test(v) ? v : `"${v.replace(/"/g, '\\"')}"`);
@@ -33,6 +34,8 @@ export function reproduceCommand(a: Answers, dir?: string): string {
   for (const k of ['edition', 'msrv', 'toolchain', 'license'] as const) {
     if (a[k] !== base[k]) parts.push(`--${k}`, quote(a[k]));
   }
+  const bin = effectiveAnswers(a).bin;
+  if (bin) parts.push('--bin', quote(bin));
   if (a.tagline !== base.tagline) parts.push('--set', `tagline=${quote(a.tagline)}`);
   if (!a.post.git) parts.push('--no-git');
   if (!a.post.fetch) parts.push('--no-fetch');

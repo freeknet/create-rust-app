@@ -32,7 +32,7 @@ async fn run(args: &[&str]) -> anyhow::Result<(ExitCode, String)> {
 
 #[tokio::test]
 async fn a_bare_run_is_a_usage_error() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@"]).await?;
+    let (code, out) = run(&["@@bin@@"]).await?;
     // @else
 
 /// Runs the program with `args` and returns its exit code and stdout.
@@ -44,7 +44,7 @@ fn run(args: &[&str]) -> anyhow::Result<(ExitCode, String)> {
 
 #[test]
 fn a_bare_run_is_a_usage_error() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@"])?;
+    let (code, out) = run(&["@@bin@@"])?;
     // @end
     assert_eq!(code, usage_error(), "a subcommand is required");
     assert!(out.is_empty(), "nothing ran: {out:?}");
@@ -54,11 +54,11 @@ fn a_bare_run_is_a_usage_error() -> anyhow::Result<()> {
 // @if async_tokio
 #[tokio::test]
 async fn hello_greets_the_named_person() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@", "hello", "--name", "Ferris"]).await?;
+    let (code, out) = run(&["@@bin@@", "hello", "--name", "Ferris"]).await?;
     // @else
 #[test]
 fn hello_greets_the_named_person() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@", "hello", "--name", "Ferris"])?;
+    let (code, out) = run(&["@@bin@@", "hello", "--name", "Ferris"])?;
     // @end
     assert_eq!(code, SUCCESS, "hello succeeds");
     assert!(out.contains("Ferris"), "--name is used: {out:?}");
@@ -68,11 +68,11 @@ fn hello_greets_the_named_person() -> anyhow::Result<()> {
 // @if async_tokio
 #[tokio::test]
 async fn sum_prints_the_total() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@", "sum", "2", "40", "-5"]).await?;
+    let (code, out) = run(&["@@bin@@", "sum", "2", "40", "-5"]).await?;
     // @else
 #[test]
 fn sum_prints_the_total() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@", "sum", "2", "40", "-5"])?;
+    let (code, out) = run(&["@@bin@@", "sum", "2", "40", "-5"])?;
     // @end
     assert_eq!(code, SUCCESS, "sum succeeds");
     assert_eq!(out, "37\n", "the total, on its own line");
@@ -83,12 +83,12 @@ fn sum_prints_the_total() -> anyhow::Result<()> {
 #[tokio::test]
 async fn sum_reports_overflow_as_an_error() -> anyhow::Result<()> {
     let max = i64::MAX.to_string();
-    let result = run(&["@@name@@", "sum", &max, "1"]).await;
+    let result = run(&["@@bin@@", "sum", &max, "1"]).await;
     // @else
 #[test]
 fn sum_reports_overflow_as_an_error() -> anyhow::Result<()> {
     let max = i64::MAX.to_string();
-    let result = run(&["@@name@@", "sum", &max, "1"]);
+    let result = run(&["@@bin@@", "sum", &max, "1"]);
     // @end
     assert!(result.is_err(), "overflow fails, it never wraps");
     Ok(())
@@ -97,11 +97,11 @@ fn sum_reports_overflow_as_an_error() -> anyhow::Result<()> {
 // @if async_tokio
 #[tokio::test]
 async fn sum_rejects_a_non_number() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@", "sum", "two"]).await?;
+    let (code, out) = run(&["@@bin@@", "sum", "two"]).await?;
     // @else
 #[test]
 fn sum_rejects_a_non_number() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@", "sum", "two"])?;
+    let (code, out) = run(&["@@bin@@", "sum", "two"])?;
     // @end
     assert_eq!(code, usage_error(), "clap refuses it before anything runs");
     assert!(out.is_empty(), "nothing ran: {out:?}");
@@ -111,11 +111,11 @@ fn sum_rejects_a_non_number() -> anyhow::Result<()> {
 // @if async_tokio
 #[tokio::test]
 async fn version_is_not_an_error() -> anyhow::Result<()> {
-    let (code, _) = run(&["@@name@@", "--version"]).await?;
+    let (code, _) = run(&["@@bin@@", "--version"]).await?;
     // @else
 #[test]
 fn version_is_not_an_error() -> anyhow::Result<()> {
-    let (code, _) = run(&["@@name@@", "--version"])?;
+    let (code, _) = run(&["@@bin@@", "--version"])?;
     // @end
     assert_eq!(code, SUCCESS, "--version exits 0");
     Ok(())

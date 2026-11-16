@@ -1,12 +1,12 @@
 import { parseArgs } from 'node:util';
 import { existsSync } from 'node:fs';
 import { DEFAULTS, PRESETS } from './presets.ts';
-import { validateName } from './context.ts';
+import { validateBin, validateName } from './context.ts';
 import type { PartialAnswers } from './types.ts';
 
 /** @type {Record<string, import('node:util').ParseArgsOptionConfig>} */
 const OPTIONS: NonNullable<import('node:util').ParseArgsConfig['options']> = {};
-for (const name of ['name', 'preset', 'kind', 'gui', 'edition', 'msrv', 'toolchain', 'license', 'author', 'github', 'accent', 'open']) {
+for (const name of ['name', 'bin', 'preset', 'kind', 'gui', 'edition', 'msrv', 'toolchain', 'license', 'author', 'github', 'accent', 'open']) {
   OPTIONS[name] = { type: 'string' };
 }
 for (const name of ['with', 'without', 'set']) OPTIONS[name] = { type: 'string', multiple: true };
@@ -87,6 +87,10 @@ function setAnswer(target: Record<string, unknown>, path: string, value: string 
   if (path === 'name') {
     const error = validateName(String(value));
     if (error) throw new Error('Invalid project name: ' + error);
+  }
+  if (path === 'bin' && value !== '') {
+    const error = validateBin(String(value));
+    if (error) throw new Error('Invalid binary name: ' + error);
   }
   if (path === 'accent' && !/^#[\da-f]{6}$/i.test(String(value))) throw new Error('accent must be a six-digit hex color, such as #00e5ff.');
   if (['msrv', 'toolchain'].includes(path) && !/^\d+\.\d+(?:\.\d+)?$/.test(String(value))) throw new Error(path + ' must be a Rust version number.');
@@ -187,6 +191,7 @@ export async function renderHelp(caps: unknown) {
     'Default directory: ./<name>. Non-TTY input accepts defaults.', '',
     heading('Project'),
     '  --name <name>          Lowercase Rust project name (default: my-app)',
+    '  --bin <name>           Executable name, when it differs from the crate (writes [[bin]])',
     '  --preset <preset>      ' + Object.keys(PRESETS).join(' | ') + ' | custom',
     '  --kind <kind>          cli | gui | tui | lib | workspace',
     '  --gui <stack>          eframe | winit-glow',
