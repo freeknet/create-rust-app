@@ -77,6 +77,8 @@ test('generated README links back to this repository (package.json repository.ur
   const links = [...readme.matchAll(/https:\/\/github\.com\/[\w.-]+\/create-rust-app\b/g)].map((m) => m[0]);
   assert.ok(links.length > 0, 'the footer links to create-rust-app');
   for (const link of links) assert.equal(link, repo, 'README template link matches package.json');
+  const { RUN_COMMAND } = await import('../src/reproduce.ts');
+  assert.equal(RUN_COMMAND, 'npx github:' + repo.replace('https://github.com/', ''), 'the run command installs this repository');
 });
 
 test('template deps.js never pins a different version of a base crate', async () => {
@@ -94,4 +96,11 @@ test('template deps.js never pins a different version of a base crate', async ()
       if (want && (dep.crate ?? 'app') === 'app') assert.equal(dep.version, want, `${preset}: ${dep.name} keeps the base version`);
     }
   }
+});
+
+test('GUI_ONLY_FEATURES covers every desktop feature label except the shared settings file', async () => {
+  const { GUI_ONLY_FEATURES } = await import('../src/context.ts');
+  const { DESKTOP } = await import('../src/ui/labels.ts');
+  const desktop = Object.keys(DESKTOP).filter((k) => k !== 'config').sort();
+  assert.deepEqual([...GUI_ONLY_FEATURES].sort(), desktop, 'a new GUI feature must be added to both lists');
 });

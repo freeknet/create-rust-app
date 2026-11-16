@@ -160,6 +160,11 @@ test('the reproduce command round-trips through the argument parser', () => {
   assert.equal(back.bin, 'nd', '--bin survives the round trip');
   assert.equal(back.features.subcommands, true, 'subcommands survive the round trip');
   assert.equal(reproduceCommand(resolveAnswers('cli', { name: 'x' })), `${RUN_COMMAND} x --preset cli -y`, 'defaults stay one short line');
+  // Options a kind never generates aren't listed, and a kind changed from the preset's is.
+  assert.equal(reproduceCommand(resolveAnswers(null, { name: 'x', kind: 'cli' })), `${RUN_COMMAND} x --kind cli -y`, 'no desktop --without noise');
+  assert.equal(reproduceCommand(resolveAnswers('rustaman', { name: 'x', kind: 'tui' })), `${RUN_COMMAND} x --preset rustaman --kind tui -y`, 'kind survives with a preset');
+  const noEffect = resolveAnswers('cli', { name: 'x', crates: { clap: false }, features: { subcommands: true } });
+  assert.equal(reproduceCommand(noEffect), `${RUN_COMMAND} x --preset cli --without clap -y`, 'subcommands without clap is not listed');
 });
 
 test('ASCII fallback has no non-ASCII when unicode=false', () => {

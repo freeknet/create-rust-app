@@ -4,7 +4,9 @@
 //               does.
 //
 // Dependencies: clap (derive) for parsing, std::io for output
-// @if http_ureq
+// @if http_ureq & async_tokio
+//               ureq for the fetch command, on tokio's blocking pool
+// @elif http_ureq
 //               ureq for the fetch command
 // @elif http_reqwest
 //               reqwest for the fetch command

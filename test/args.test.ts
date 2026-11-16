@@ -67,4 +67,6 @@ test('parseArgv: --bin takes a command name and refuses bad ones (#8)', () => {
   assert.throws(() => parseArgv(['--bin', 'Ave']), /Invalid binary name/);
   assert.throws(() => parseArgv(['--bin', 'build']), /reserved by Cargo/);
   assert.throws(() => parseArgv(['--bin', '2go']), /Invalid binary name/);
+  assert.throws(() => parseArgv(['--bin', 'nul']), /reserved device name on Windows/);
+  assert.equal(parseArgv(['--bin', 'console']).overrides.bin, 'console', 'only exact device names are refused');
 });

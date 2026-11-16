@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fileTree } from '../src/cli.ts';
+import { resolveAnswers } from '../src/presets.ts';
 
 const BIN = fileURLToPath(new URL('../bin/create-rust-app.ts', import.meta.url));
 /** @param {string[]} args */
@@ -75,12 +76,14 @@ test('Cargo.lock from cargo fetch is part of the first commit (#11)', { skip: pr
   if (spawnSync('git', ['--version']).status !== 0) { t.skip('git not on PATH'); return; }
   const base = await mkdtemp(join(tmpdir(), 'cra-lock-'));
   try {
-    // A stand-in cargo: `fetch` writes Cargo.lock, as the real one does. No rustup on this PATH
-    // means "can't tell", so the toolchain check lets it run.
+    // Stand-ins: cargo's `fetch` writes Cargo.lock, as the real one does, and rustup reports the
+    // pinned toolchain, so a real rustup next to git on PATH can't skip the fetch.
     const bin = join(base, 'bin');
     await import('node:fs/promises').then((fs) => fs.mkdir(bin));
     writeFileSync(join(bin, 'cargo'), '#!/bin/sh\n[ "$1" = fetch ] && echo "# lock" > Cargo.lock\nexit 0\n');
+    writeFileSync(join(bin, 'rustup'), `#!/bin/sh\necho "${resolveAnswers('minimal', {}).toolchain}-stand-in"\n`);
     chmodSync(join(bin, 'cargo'), 0o755);
+    chmodSync(join(bin, 'rustup'), 0o755);
     const gitDir = spawnSync('sh', ['-c', 'dirname "$(command -v git)"'], { encoding: 'utf8' }).stdout.trim();
     const dir = join(base, 'demo');
     const r = spawnSync(process.execPath, [BIN, dir, '--preset', 'minimal', '--yes', '--quiet'], {

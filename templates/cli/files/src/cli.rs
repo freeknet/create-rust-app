@@ -6,7 +6,9 @@
 // @if clap
 //               clap (derive) for parsing
 // @end
-// @if clap & http_ureq
+// @if clap & http_ureq & async_tokio
+//               ureq for the fetch command, on tokio's blocking pool
+// @elif clap & http_ureq
 //               ureq for the fetch command
 // @elif clap & http_reqwest
 //               reqwest for the fetch command

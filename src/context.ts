@@ -17,6 +17,8 @@ export function validateBin(bin: string) {
   if (!/^[a-z][a-z0-9_-]*$/.test(bin)) return 'Use lowercase letters, digits, dashes and underscores, starting with a letter.';
   // Cargo refuses these as target names: they collide with directories under target/.
   if (['deps', 'examples', 'build', 'incremental'].includes(bin)) return `"${bin}" is reserved by Cargo.`;
+  // Every project builds a Windows .exe, and Windows treats these as devices, not files.
+  if (/^(con|prn|aux|nul|com\d|lpt\d)$/.test(bin)) return `"${bin}" is a reserved device name on Windows.`;
   return null;
 }
 
