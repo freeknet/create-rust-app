@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, resolve, relative } from 'node:path';
 import { parseArgv, optionalUi, renderHelp } from './args.ts';
 import { resolveAnswers } from './presets.ts';
-import { buildContext, validateName } from './context.ts';
+import { buildContext, effectiveAnswers, validateName } from './context.ts';
 import { buildPlan } from './engine/plan.ts';
 import { targetProblem, writePlan } from './engine/write.ts';
 import { initRepo } from './post/git.ts';
@@ -71,6 +71,7 @@ export function nextCommands(a: Answers, shown: string): [string, string][] {
   const out: [string, string][] = [];
   if (shown !== '.') out.push([`cd ${shown}`, '']);
   if (a.kind === 'lib') out.push(['cargo test', 'unit + doc tests']);
+  else if (effectiveAnswers(a).features.subcommands) out.push(['cargo run -- --help', 'lists the subcommands']);
   else out.push(['cargo run', a.kind === 'gui' || a.kind === 'workspace' ? 'first build takes a minute' : '']);
   if (a.kind === 'workspace') out.push(['cargo xtask ci', 'the same gate CI runs']);
   else out.push(['cargo clippy --all-targets -- -D warnings', 'the lint gate CI runs']);
@@ -112,6 +113,8 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
         return { ok: true, message: `Wrote ${plan.length} files to ${shown}` };
       },
     },
+    // Fetch first: it writes Cargo.lock, which belongs in the first commit (#11).
+    { title: 'cargo fetch', enabled: answers.post.fetch, run: cargoTask('cargo fetch', cargoFetch) },
     {
       title: 'git init', enabled: answers.post.git, run: async () => {
         const r = initRepo(target, answers);
@@ -120,7 +123,6 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
           : { ok: r.ok, message: `git ${r.ok === false ? 'failed' : 'skipped'} ${dim(caps, `(${r.reason ?? ''})`)}` };
       },
     },
-    { title: 'cargo fetch', enabled: answers.post.fetch, run: cargoTask('cargo fetch', cargoFetch) },
     { title: 'cargo check', enabled: answers.post.cargoCheck, run: cargoTask('cargo check', cargoCheck) },
   ]);
   if (!finished) {
@@ -222,7 +224,8 @@ export async function main(argv: string[]) {
 
     if (json) {
       if (!flags['dry-run']) await writePlan(plan, target, { force: Boolean(flags.force) });
-      console.log(JSON.stringify({ answers, files: dests }, null, 2));
+      // Report what was generated: options this kind never uses read false (#6).
+      console.log(JSON.stringify({ answers: effectiveAnswers(answers), files: dests }, null, 2));
       return 0;
     }
     if (flags['dry-run']) {
@@ -247,14 +250,7 @@ export async function main(argv: string[]) {
         message() {},
         stop: (/** @type {string} */ m: string) => console.log(m),
       };
-    /** @type {boolean | undefined} */
-    let gitDone: boolean | undefined;
-    if (answers.post.git) {
-      const r = initRepo(target, answers);
-      gitDone = r.ok === true;
-      if (r.ok === false) log(`warning: ${r.reason}`);
-      else if (r.ok === null) log(`git skipped: ${r.reason}`);
-    }
+    // Fetch before git: cargo fetch writes Cargo.lock, which belongs in the first commit (#11).
     if (answers.post.fetch) {
       let hint = '';
       spinner.start('cargo fetch');
@@ -266,6 +262,14 @@ export async function main(argv: string[]) {
       });
       if (fetched === null) spinner.stop(`cargo fetch skipped${hint ? ` (${hint})` : ''}`, true);
       else spinner.stop(fetched ? 'cargo fetch done' : 'cargo fetch failed (run it in the project for details)', fetched);
+    }
+    /** @type {boolean | undefined} */
+    let gitDone: boolean | undefined;
+    if (answers.post.git) {
+      const r = initRepo(target, answers);
+      gitDone = r.ok === true;
+      if (r.ok === false) log(`warning: ${r.reason}`);
+      else if (r.ok === null) log(`git skipped: ${r.reason}`);
     }
     /** @type {boolean | null} */
     let cargoChecked: boolean | null = null;

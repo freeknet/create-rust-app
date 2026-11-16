@@ -69,7 +69,7 @@ cargo run --release              # what a user gets: LTO, panic = "abort"
 <!-- @elif kind_tui -->
 ```bash
 cargo run                        # opens in the current terminal
-cargo install --path .           # puts `@@name@@` on your PATH
+cargo install --path .           # puts `@@bin@@` on your PATH
 ```
 <!-- @else -->
 ```bash
@@ -78,7 +78,7 @@ cargo run -- --help              # every subcommand and flag
 <!-- @else -->
 cargo run
 <!-- @end -->
-cargo install --path .           # puts `@@name@@` on your PATH
+cargo install --path .           # puts `@@bin@@` on your PATH
 ```
 <!-- @end -->
 
@@ -256,4 +256,4 @@ conditions.
 
 ---
 
-<sub>Scaffolded with [create-rust-app](https://github.com/lnorton89/create-rust-app).</sub>
+<sub>Scaffolded with [create-rust-app](https://github.com/freeknet/create-rust-app).</sub>

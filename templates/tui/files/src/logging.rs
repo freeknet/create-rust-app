@@ -3,7 +3,13 @@
 // Description:  Logging setup: diagnostics to a file, because the terminal
 //               belongs to the UI while it runs.
 //
-// Dependencies: the selected logging crate
+// @if log_env_logger
+// Dependencies: log + env_logger, writing to the log file
+// @elif log_tracing
+// Dependencies: tracing-subscriber, writing to the log file
+// @else
+// Dependencies: log, with the minimal file logger defined here
+// @end
 // ============================================================================
 
 //! Logging setup.

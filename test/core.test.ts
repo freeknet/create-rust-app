@@ -68,3 +68,39 @@ test('context, tokens and paths', () => {
 test('every preset builds a context', () => {
   for (const p of Object.keys(PRESETS)) assert.ok(buildContext(resolveAnswers(p, { name: 'x-y' })).flags.size > 0, p);
 });
+
+test('generated README links back to this repository (package.json repository.url)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  const repo = String(pkg.repository.url).replace(/^git\+/, '').replace(/\.git$/, '');
+  const readme = await readFile(new URL('../templates/base/files/README.md', import.meta.url), 'utf8');
+  const links = [...readme.matchAll(/https:\/\/github\.com\/[\w.-]+\/create-rust-app\b/g)].map((m) => m[0]);
+  assert.ok(links.length > 0, 'the footer links to create-rust-app');
+  for (const link of links) assert.equal(link, repo, 'README template link matches package.json');
+  const { RUN_COMMAND } = await import('../src/reproduce.ts');
+  assert.equal(RUN_COMMAND, 'npx github:' + repo.replace('https://github.com/', ''), 'the run command installs this repository');
+});
+
+test('template deps.js never pins a different version of a base crate', async () => {
+  const { baseDeps, collectDeps } = await import('../src/gen/deps.ts');
+  const combos = [
+    ['cli', { crates: { http: 'reqwest', async: 'none', sqlite: true } }],
+    ['cli', { crates: { http: 'ureq', async: 'tokio' } }],
+    ['tui', {}], ['lib', {}], ['rustaman', {}], ['strobe', {}],
+  ] as const;
+  for (const [preset, extra] of combos) {
+    const ctx = buildContext(resolveAnswers(preset, { name: 'v-' + preset, ...extra }));
+    const base = new Map(baseDeps(ctx).map((d) => [d.name, d.version]));
+    for (const dep of await collectDeps(ctx)) {
+      const want = base.get(dep.name);
+      if (want && (dep.crate ?? 'app') === 'app') assert.equal(dep.version, want, `${preset}: ${dep.name} keeps the base version`);
+    }
+  }
+});
+
+test('GUI_ONLY_FEATURES covers every desktop feature label except the shared settings file', async () => {
+  const { GUI_ONLY_FEATURES } = await import('../src/context.ts');
+  const { DESKTOP } = await import('../src/ui/labels.ts');
+  const desktop = Object.keys(DESKTOP).filter((k) => k !== 'config').sort();
+  assert.deepEqual([...GUI_ONLY_FEATURES].sort(), desktop, 'a new GUI feature must be added to both lists');
+});

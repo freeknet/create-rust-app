@@ -33,7 +33,7 @@ export default (ctx) => {
   if (f.has('themes') || f.has('config')) {
     deps.push(
       { name: 'serde', version: '1', features: ['derive'] },
-      { name: 'toml', version: '1.1' },
+      { name: 'toml', version: '1.2' },
       { name: 'dirs', version: '7' },
     );
   }

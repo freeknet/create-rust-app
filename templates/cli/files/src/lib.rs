@@ -3,7 +3,31 @@
 // Description:  The whole application behind one testable entry point:
 //               argument parsing, logging setup, and command dispatch.
 //
-// Dependencies: anyhow; clap, configuration, HTTP and SQLite when selected
+// Dependencies: anyhow for errors
+// @if clap
+//               clap (derive) for the command line
+// @end
+// @if log_env_logger
+//               log + env_logger for diagnostics
+// @elif log_tracing
+//               tracing + tracing-subscriber for diagnostics
+// @else
+//               log for diagnostics (with a minimal built-in logger)
+// @end
+// @if serde & config
+//               serde + toml + dirs for the config file
+// @end
+// @if clap & http_ureq
+//               ureq for the fetch command
+// @elif clap & http_reqwest
+//               reqwest for the fetch command
+// @end
+// @if sqlite
+//               rusqlite (bundled SQLite) + dirs for the database
+// @end
+// @if async_tokio
+//               tokio for the async runtime
+// @end
 // ============================================================================
 
 //! @@displayName@@: @@tagline@@

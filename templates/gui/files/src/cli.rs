@@ -6,7 +6,7 @@
 // @if clap
 // Dependencies: clap (derive)
 // @else
-// Dependencies: std only (a hand-rolled parser; clap was not selected)
+// Dependencies: std only (a hand-rolled parser, no clap)
 // @end
 // ============================================================================
 
@@ -20,7 +20,7 @@
 /// The parsed command line.
 // @if clap
 #[derive(clap::Parser, Debug, Default, PartialEq)]
-#[command(name = "@@name@@", version, about = crate::TAGLINE)]
+#[command(name = "@@bin@@", version, about = crate::TAGLINE)]
 // @else
 #[derive(Debug, Default, PartialEq)]
 // @end
@@ -127,7 +127,7 @@ mod tests {
 
     /// Parses `args` after a program name.
     fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
-        Cli::try_parse_from(std::iter::once("@@name@@").chain(args.iter().copied()))
+        Cli::try_parse_from(std::iter::once("@@bin@@").chain(args.iter().copied()))
     }
     // @else
 

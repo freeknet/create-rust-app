@@ -1,6 +1,8 @@
 /** User choices accepted by the scaffolder. */
 export interface Answers {
   name: string;
+  /** Executable name when it differs from the crate (`[[bin]]`); '' = the crate name. */
+  bin: string;
   displayName: string;
   tagline: string;
   author: string;
@@ -21,7 +23,7 @@ export interface Answers {
   features: {
     themes: boolean; brand: boolean; motion: boolean; icons: boolean; config: boolean;
     winres: boolean; tray: boolean; singleInstance: boolean; commandPalette: boolean;
-    screenshotExample: boolean;
+    screenshotExample: boolean; subcommands: boolean;
   };
   tooling: {
     ci: boolean; release: boolean; cargoDeny: boolean; dependabot: boolean;
@@ -36,7 +38,7 @@ export type PartialAnswers = {
   [K in keyof Answers]?: Answers[K] extends object ? Partial<Answers[K]> : Answers[K];
 };
 
-export type TokenKey = 'name' | 'crate' | 'Name' | 'NAME' | 'appCrate' | 'appCrateSnake'
+export type TokenKey = 'name' | 'bin' | 'crate' | 'Name' | 'NAME' | 'appCrate' | 'appCrateSnake'
   | 'displayName' | 'tagline' | 'author' | 'github' | 'email' | 'year' | 'license'
   | 'edition' | 'msrv' | 'toolchain' | 'accent';
 

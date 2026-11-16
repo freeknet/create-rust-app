@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `Cargo.lock` is part of the scaffold's first commit: `cargo fetch` now runs before `git init`,
+  so a fresh project no longer starts with an untracked lockfile.
+- `--json` reports the features a kind actually generates: desktop features read `false` for
+  `cli` / `tui` / `lib`. A TUI no longer gets config-file bullets in its docs or an unused `dirs`.
+- Generated header banners list the crates the project uses, not the template's options
+  ("clap … when selected").
+- Generated `--help` prints the Cargo description instead of the `Cli` struct's doc comment.
+- A `cli` with `reqwest` and no tokio builds again (the blocking client asked for reqwest 0.12).
+- The generated README's footer links to `github.com/freeknet/create-rust-app`.
+- `npx github:freeknet/create-rust-app` works: a `prepare` script builds `dist/` on install. The
+  README and the finish screen's reproduce command use it, since the npm name isn't published.
+
 - An interactive run into an occupied folder carried on after the failed write: it ran `git init`,
   committed what was there, printed success and exited 0. Occupied folders are now refused before
   any question (unless `--force`), and a failed write stops the run with exit code 1.
@@ -34,6 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--with subcommands`: a `cli` built on a clap `Subcommand` enum (no wildcard dispatch) with
+  matching integration tests, instead of the greeting demo.
+- `--bin <name>`: an executable named differently from its crate. Writes `[[bin]]` and follows
+  through clap, the README, the release workflow and the issue form. Also under Customize….
+- README documents `--set`, `--bin` and `--preset custom`.
 - Project README covering presets, CLI flags, Rust conventions, and contributing.
 - MIT license, copyright 2026 Lawrence Norton.
 - Node 20, 22, and 26 CI on Linux and Windows, plus per-preset Rust scaffold checks.

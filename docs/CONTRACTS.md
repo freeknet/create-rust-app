@@ -33,7 +33,7 @@ test/*.test.ts             node --test
 
 ```js
 {
-  name, displayName, tagline, author, github, email,
+  name, bin /* '' = executable named after its crate */, displayName, tagline, author, github, email,
   license: 'MIT' | 'MIT+CommonsClause' | 'Apache-2.0' | 'MIT OR Apache-2.0',
   edition: '2024' | '2021', msrv: '1.98', toolchain: '1.99.1', accent: '#00e5ff',
   kind: 'cli' | 'gui' | 'tui' | 'lib' | 'workspace',
@@ -42,7 +42,7 @@ test/*.test.ts             node --test
               serde: bool, async: 'none'|'tokio', http: 'none'|'ureq'|'reqwest',
               sqlite: bool, clap: bool },
   features: { themes, brand, motion, icons, config, winres, tray, singleInstance,
-              commandPalette, screenshotExample },            // all bool
+              commandPalette, screenshotExample, subcommands }, // all bool; subcommands: cli + clap only
   tooling:  { ci, release, cargoDeny, dependabot, toolchainPin, agentDocs, headerCheck,
               unsafeCheck, changelogGen, issueTemplates, codeowners, securityMd }, // all bool
   post:     { git: bool, cargoCheck: bool, open: 'none'|'code'|'cursor' },
@@ -52,7 +52,10 @@ test/*.test.ts             node --test
 
 ## Ctx = Answers + derived
 
-`buildContext(answers)` adds: `crate` (snake), `Name` (Pascal), `NAME` (SCREAMING),
+`buildContext(answers)` first applies `effectiveAnswers(answers)` (src/context.ts): options the kind
+never generates are set to `false` (desktop features and `unsafeCheck` without a GUI; `config` for
+`lib`, `tui`, and `cli` without serde). The Ctx and `--json` both carry these effective values.
+It then adds: `crate` (snake), `Name` (Pascal), `NAME` (SCREAMING),
 `year`, `appCrate` (workspace: `<name>-app`, else `<name>`), `flags: Set<string>`, `tokens`.
 
 ### Flags (used by directives and `when`)
@@ -63,12 +66,15 @@ test/*.test.ts             node --test
 - every true boolean in crates/features/tooling by its key: `thiserror`, `serde`, `sqlite`, `clap`,
   `themes`, `tray`, `ci`, `release`, …
 - `has_gui` (kind gui, or workspace — the workspace app crate is a GUI), `has_bin` (kind ≠ lib),
+  `custom_bin` (`--bin` names the executable differently from its crate; a `[[bin]]` table is written),
   `workspace` (kind workspace), `single` (not workspace)
 
 ### Tokens (`@@x@@`)
 
-`name crate Name NAME appCrate appCrateSnake displayName tagline author github email year license edition msrv
-toolchain accent module`. `@@module@@` is computed per file by `moduleFor(dest, ctx)`.
+`name bin crate Name NAME appCrate appCrateSnake displayName tagline author github email year license edition msrv
+toolchain accent module`. `@@module@@` is computed per file by `moduleFor(dest, ctx)`. `@@bin@@` is the
+command users type (`--bin`, else the project name); where the executable's file name matters (release
+packaging) templates use `@@bin@@` under `custom_bin` and `@@appCrate@@` otherwise.
 Unknown tokens throw (so a typo fails tests loudly).
 
 ## Templates

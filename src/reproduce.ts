@@ -3,15 +3,26 @@
  * It lists only what differs from the chosen preset, so the common case stays one short line.
  */
 import { resolveAnswers } from './presets.ts';
+import { effectiveAnswers } from './context.ts';
 import type { Answers } from './types.ts';
+
+/**
+ * How to run the tool. The `create-rust-app` name on npm is not published by this project (an
+ * unrelated package of that name was unpublished in 2025), so this runs it from GitHub, which npm
+ * builds through the `prepare` script. Switch to `npx create-rust-app` once it is on npm.
+ */
+export const RUN_COMMAND = 'npx github:freeknet/create-rust-app';
 
 const quote = (v: string) => (/^[\w.@/:+-]+$/.test(v) ? v : `"${v.replace(/"/g, '\\"')}"`);
 
-export function reproduceCommand(a: Answers, dir?: string): string {
-  const base = resolveAnswers(a.preset, { name: a.name });
-  const parts = ['npx create-rust-app', quote(dir ?? a.name)];
-  if (a.preset) parts.push('--preset', a.preset);
-  else if (a.kind !== base.kind) parts.push('--kind', a.kind);
+export function reproduceCommand(raw: Answers, dir?: string): string {
+  const preset = resolveAnswers(raw.preset, { name: raw.name });
+  const parts = [RUN_COMMAND, quote(dir ?? raw.name)];
+  if (raw.preset) parts.push('--preset', raw.preset);
+  if (raw.kind !== preset.kind) parts.push('--kind', raw.kind);
+  // Compare what each would generate for this kind, so options it never uses aren't listed.
+  const a = effectiveAnswers(raw);
+  const base = effectiveAnswers({ ...preset, kind: raw.kind });
 
   const on: string[] = [];
   const off: string[] = [];
@@ -33,6 +44,7 @@ export function reproduceCommand(a: Answers, dir?: string): string {
   for (const k of ['edition', 'msrv', 'toolchain', 'license'] as const) {
     if (a[k] !== base[k]) parts.push(`--${k}`, quote(a[k]));
   }
+  if (a.bin) parts.push('--bin', quote(a.bin));
   if (a.tagline !== base.tagline) parts.push('--set', `tagline=${quote(a.tagline)}`);
   if (!a.post.git) parts.push('--no-git');
   if (!a.post.fetch) parts.push('--no-fetch');

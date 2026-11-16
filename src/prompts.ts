@@ -11,13 +11,13 @@ import { isCancel } from '@clack/core';
 import { cancel, note, text } from './ui/rail.ts';
 import { glyphs } from './ui/glyphs.ts';
 import { PRESETS, resolveAnswers } from './presets.ts';
-import { validateName } from './context.ts';
+import { effectiveAnswers, validateBin, validateName } from './context.ts';
 import { dim, hex, bold } from './ui/rainbow.ts';
 import { pick, pickMany } from './ui/choose.ts';
 import type { Item } from './ui/choose.ts';
 import { STOPS } from './ui/theme.ts';
 import { wrap } from './ui/tty.ts';
-import { ASYNC, CRATE_TOGGLES, FEATURES, HTTP, KINDS, LICENSES, LOGGING, STACKS, TOOLING, grouped } from './ui/labels.ts';
+import { ASYNC, CRATE_TOGGLES, DESKTOP, FEATURES, HTTP, KINDS, LICENSES, LOGGING, STACKS, TOOLING, grouped } from './ui/labels.ts';
 import type { Choice } from './ui/labels.ts';
 import type { Answers, Caps, PartialAnswers } from './types.ts';
 
@@ -59,7 +59,7 @@ export function reviewLines(caps: Caps, a: Answers): { title: string; body: stri
     (Object.keys(cat) as K[]).filter((k) => values[k] && (!group || cat[k].group === group)).map((k) => soft(cat[k].label));
 
   const crates = ['anyhow'];
-  if (a.crates.clap && a.kind !== 'lib') crates.push('clap');
+  if (a.crates.clap && a.kind !== 'lib') crates.push(a.kind === 'cli' && a.features.subcommands ? 'clap subcommands' : 'clap');
   crates.push(LOGGING[a.crates.logging].label);
   if (a.crates.serde) crates.push('serde + toml');
   if (a.crates.thiserror) crates.push('thiserror');
@@ -81,7 +81,7 @@ export function reviewLines(caps: Caps, a: Answers): { title: string; body: stri
 
   const sections: [string, string, string[]][] = [
     ['crates', STOPS[0] ?? '', crates],
-    ...(isGui(a) ? [['app', STOPS[5] ?? '', on(FEATURES, a.features)] as [string, string, string[]]] : []),
+    ...(isGui(a) ? [['app', STOPS[5] ?? '', on(DESKTOP, a.features)] as [string, string, string[]]] : []),
     ['guardrails', STOPS[3] ?? '', guardrails],
     ['github', STOPS[2] ?? '', on(TOOLING, a.tooling, 'github')],
     ['docs', STOPS[1] ?? '', on(TOOLING, a.tooling, 'docs')],
@@ -93,7 +93,8 @@ export function reviewLines(caps: Caps, a: Answers): { title: string; body: stri
     .flatMap(([name, color, items]) => wrap(items.join(sep), max).map((line, i) =>
       `${i === 0 ? hex(caps, color, name.padEnd(label)) : ' '.repeat(label)}${line}`))
     .join('\n');
-  const title = `${bold(caps, a.name)}${dim(caps, `${sep}${KINDS[a.kind]}${sep}Rust ${a.edition}${sep}${LICENSES[a.license].label}`)}`;
+  const bin = effectiveAnswers(a).bin;
+  const title = `${bold(caps, a.name)}${dim(caps, `${bin ? ` (runs as ${bin})` : ''}${sep}${KINDS[a.kind]}${sep}Rust ${a.edition}${sep}${LICENSES[a.license].label}`)}`;
   return { title, body };
 }
 
@@ -154,7 +155,7 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
     { value: 'tooling', label: 'Tooling', hint: 'CI, releases, guardrails, docs' },
     { value: 'rust', label: 'Licence + Rust', hint: `${LICENSES[a.license].label} · edition ${a.edition} · MSRV ${a.msrv} · pin ${a.toolchain}` },
     { value: 'after', label: 'After creating', hint: 'git, cargo fetch / check, open editor' },
-    { value: 'details', label: 'Name + tagline', hint: `${a.name} — ${a.tagline}` },
+    { value: 'details', label: a.kind === 'lib' ? 'Name + tagline' : 'Name, command + tagline', hint: `${a.name}${effectiveAnswers(a).bin ? ` (runs as ${a.bin})` : ''} — ${a.tagline}` },
     { value: 'preset', label: 'Start over from a preset', hint: 'resets everything else' },
     { value: 'back', label: 'Back to review', hint: '' },
   ]);
@@ -171,6 +172,15 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
       initialValues: toggles.filter((k) => out.crates[k]),
     }));
     for (const k of toggles) out.crates[k] = picked.includes(k);
+    if (a.kind === 'cli' && out.crates.clap) {
+      out.features.subcommands = got(await pick(caps, {
+        message: 'Command line', initialValue: out.features.subcommands,
+        options: ([
+          { value: false, label: 'One command', hint: 'flags only, with a greeting to replace' },
+          { value: true, label: FEATURES.subcommands.label, hint: 'tool <command> …, one enum variant per job' },
+        ]),
+      }));
+    }
     out.crates.logging = got(await pick(caps, { message: 'Logging', initialValue: out.crates.logging, options: items(LOGGING, ['log', 'env_logger', 'tracing']) }));
     out.crates.async = got(await pick(caps, { message: 'Async runtime', initialValue: out.crates.async, options: items(ASYNC, ['none', 'tokio']) }));
     out.crates.http = got(await pick(caps, { message: 'HTTP client', initialValue: out.crates.http, options: items(HTTP, ['none', 'ureq', 'reqwest']) }));
@@ -178,13 +188,13 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
 
   if (which === 'app') {
     out.guiStack = got(await pick(caps, { message: 'GUI runtime', initialValue: out.guiStack, options: items(STACKS, ['eframe', 'winit-glow']) }));
-    const keys = Object.values(grouped(FEATURES)).flat();
+    const keys = Object.values(grouped(DESKTOP)).flat();
     const picked = got(await pickMany(caps, {
       message: 'App features',
       options: items(FEATURES, keys, true),
       initialValues: keys.filter((k) => out.features[k]),
     }));
-    for (const k of Object.keys(FEATURES) as (keyof typeof FEATURES)[]) out.features[k] = picked.includes(k);
+    for (const k of keys) out.features[k] = picked.includes(k);
   }
 
   if (which === 'tooling') {
@@ -231,6 +241,15 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
 
   if (which === 'details') {
     out.name = got(await text(caps, { message: 'Project name', initialValue: out.name, validate: (v) => validateName(v ?? '') ?? targetCheck(v ?? '') ?? undefined }));
+    if (out.kind !== 'lib') {
+      // The executable is named after its crate unless this differs; then a [[bin]] table names it.
+      const crateBin = out.kind === 'workspace' ? `${out.name}-app` : out.name;
+      const bin = got(await text(caps, {
+        message: 'Command name (what users type)', initialValue: out.bin || crateBin, placeholder: crateBin,
+        validate: (v) => (v ? validateBin(v) ?? undefined : undefined),
+      }));
+      out.bin = bin === crateBin ? '' : bin;
+    }
     out.tagline = got(await text(caps, { message: 'One-line description', initialValue: out.tagline, placeholder: 'A Rust app.' }));
   }
   return out;

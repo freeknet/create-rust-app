@@ -23,7 +23,11 @@ body:
         - Rust: the output of `rustc --version`
 # @else
         - Install: release archive, or `cargo build --release`
+# @if custom_bin
+        - Version: @@name@@ 0.1.0 (`@@bin@@ --version`), or the commit hash if you built from source
+# @else
         - Version: @@name@@ 0.1.0 (`@@appCrate@@ --version`), or the commit hash if you built from source
+# @end
 # @end
     validations:
       required: true

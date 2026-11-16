@@ -6,7 +6,7 @@
 // Dependencies: @@crate@@ (the library), anyhow
 // ============================================================================
 
-//! Entry point for `@@name@@`.
+//! Entry point for `@@bin@@`.
 //!
 //! Deliberately thin. The event loop, the state, and the drawing all live
 //! in the library (see `src/lib.rs`). By the time an `Err` reaches `main`

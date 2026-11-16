@@ -9,7 +9,7 @@ import { STOPS, bullet, section } from '../src/ui/theme.ts';
 import { createSpinner } from '../src/ui/spinner.ts';
 import { reviewLines } from '../src/prompts.ts';
 import { nextCommands } from '../src/cli.ts';
-import { reproduceCommand } from '../src/reproduce.ts';
+import { RUN_COMMAND, reproduceCommand } from '../src/reproduce.ts';
 import { parseArgv } from '../src/args.ts';
 import { buildContext } from '../src/context.ts';
 import { resolveAnswers } from '../src/presets.ts';
@@ -135,6 +135,8 @@ test('next commands fit the kind', () => {
   assert.deepEqual(flat('lib', '.'), ['cargo test', 'cargo clippy --all-targets -- -D warnings'], 'lib: test, no cd into "."');
   assert.ok(flat('gui').includes('cargo run') && flat('gui')[0] === 'cd demo');
   assert.ok(flat('workspace').includes('cargo xtask ci'), 'workspace uses xtask');
+  const sub = resolveAnswers('cli', { name: 'demo', features: { subcommands: true } });
+  assert.ok(nextCommands(sub, 'demo').some(([c]) => c === 'cargo run -- --help'), 'a bare run of a subcommand CLI only prints usage');
 });
 
 test('the reproduce command round-trips through the argument parser', () => {
@@ -144,16 +146,25 @@ test('the reproduce command round-trips through the argument parser', () => {
   custom.tooling.release = false;
   custom.edition = '2021';
   custom.post.git = false;
+  custom.bin = 'nd';
+  custom.features.subcommands = true;
   const cmd = reproduceCommand(custom);
-  assert.ok(cmd.startsWith('npx create-rust-app neon-dash --preset cli'), cmd);
-  const argv = cmd.replace(/^npx create-rust-app /, '').split(' ');
+  assert.ok(cmd.startsWith(`${RUN_COMMAND} neon-dash --preset cli`), cmd);
+  const argv = cmd.slice(RUN_COMMAND.length + 1).split(' ');
   const { overrides } = parseArgv(argv);
   const back = resolveAnswers(overrides.preset ?? null, overrides);
   assert.deepEqual(back.crates, custom.crates, 'crates survive the round trip');
   assert.deepEqual(back.tooling, custom.tooling, 'tooling survives the round trip');
   assert.equal(back.edition, '2021');
   assert.equal(back.post.git, false);
-  assert.equal(reproduceCommand(resolveAnswers('cli', { name: 'x' })), 'npx create-rust-app x --preset cli -y', 'defaults stay one short line');
+  assert.equal(back.bin, 'nd', '--bin survives the round trip');
+  assert.equal(back.features.subcommands, true, 'subcommands survive the round trip');
+  assert.equal(reproduceCommand(resolveAnswers('cli', { name: 'x' })), `${RUN_COMMAND} x --preset cli -y`, 'defaults stay one short line');
+  // Options a kind never generates aren't listed, and a kind changed from the preset's is.
+  assert.equal(reproduceCommand(resolveAnswers(null, { name: 'x', kind: 'cli' })), `${RUN_COMMAND} x --kind cli -y`, 'no desktop --without noise');
+  assert.equal(reproduceCommand(resolveAnswers('rustaman', { name: 'x', kind: 'tui' })), `${RUN_COMMAND} x --preset rustaman --kind tui -y`, 'kind survives with a preset');
+  const noEffect = resolveAnswers('cli', { name: 'x', crates: { clap: false }, features: { subcommands: true } });
+  assert.equal(reproduceCommand(noEffect), `${RUN_COMMAND} x --preset cli --without clap -y`, 'subcommands without clap is not listed');
 });
 
 test('ASCII fallback has no non-ASCII when unicode=false', () => {

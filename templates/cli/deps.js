@@ -11,7 +11,7 @@ export default (ctx) => {
   // db.rs finds its data directory with `dirs`; base deps only add it for config.
   if (f.has('sqlite') && !config) deps.push({ name: 'dirs', version: '7' });
   // Without tokio the fetch command uses reqwest's blocking client.
-  if (f.has('http_reqwest') && !f.has('async_tokio')) deps.push({ name: 'reqwest', version: '0.12', features: ['blocking'] });
+  if (f.has('http_reqwest') && !f.has('async_tokio')) deps.push({ name: 'reqwest', version: '0.13', features: ['blocking'] });
   // The `fetch` command with ureq under tokio runs on the blocking pool (`rt` is already on).
   // Config and database tests write into throwaway directories.
   if (config || f.has('sqlite')) deps.push({ name: 'tempfile', version: '3', kind: 'dev' });

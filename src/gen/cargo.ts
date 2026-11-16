@@ -107,6 +107,15 @@ function authors(ctx: Ctx) {
 }
 
 /**
+ * The `[[bin]]` table, only when the executable is named differently from its crate (`--bin`).
+ * Declaring `src/main.rs` explicitly replaces the target Cargo would otherwise infer from it.
+ */
+function binTable(ctx: Ctx) {
+  if (!ctx.bin) return '';
+  return `\n[[bin]]\nname = ${q(ctx.bin)}\npath = "src/main.rs"\n`;
+}
+
+/**
  * Single-crate manifest.
  * @param {any} ctx @param {Dep[]} deps
  */
@@ -129,7 +138,7 @@ export function singleManifest(ctx: Ctx, deps: Dep[]) {
   const docs = lib ? '\n[package.metadata.docs.rs]\nall-features = true\nrustdoc-args = ["--cfg", "docsrs"]\n' : '';
   const appDeps = deps.filter((d: Dep) => (d.crate ?? 'app') === 'app');
   return `${pkg}
-${docs}
+${docs}${binTable(ctx)}
 ${depTables(appDeps, inlineSpec)}
 [lints.rust]
 ${lintsRust(ctx)}
@@ -193,7 +202,7 @@ rust-version.workspace = true
 authors.workspace = true
 ${ctx.license === 'MIT+CommonsClause' ? 'license-file = "../../LICENSE"' : 'license.workspace = true'}
 publish.workspace = true
-
+${name === ctx.appCrate ? binTable(ctx) : ''}
 ${depTables(ds, memberSpec)}
 [lints]
 workspace = true

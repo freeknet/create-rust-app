@@ -2,7 +2,23 @@
 // Module:       @@module@@
 // Description:  The command line and what each command does.
 //
-// Dependencies: clap (derive) when selected; std::io for output
+// Dependencies: std::io for output
+// @if clap
+//               clap (derive) for parsing
+// @end
+// @if clap & http_ureq & async_tokio
+//               ureq for the fetch command, on tokio's blocking pool
+// @elif clap & http_ureq
+//               ureq for the fetch command
+// @elif clap & http_reqwest
+//               reqwest for the fetch command
+// @end
+// @if serde & config
+//               crate::config for the saved preferences
+// @end
+// @if clap & sqlite
+//               crate::db for the db command
+// @end
 // ============================================================================
 
 //! The command line, and the commands it dispatches to.
@@ -29,7 +45,7 @@ const DEFAULT_GREETING: &str = "Hello";
 /// `about` comes from the `description` in `Cargo.toml`, so `--help` and
 /// the published crate metadata cannot drift apart.
 #[derive(clap::Parser, Debug)]
-#[command(name = "@@name@@", version, about)]
+#[command(name = "@@bin@@", version, about, long_about = None)]
 pub(crate) struct Cli {
     /// Who to greet. Overrides the saved preference for this run.
     #[arg(long, value_name = "NAME")]

@@ -139,7 +139,11 @@ jobs:
           staging="dist/${name}"
           mkdir -p "$staging"
 
+# @if custom_bin
+          cp "target/${TARGET}/release/@@bin@@.exe" "$staging/"
+# @else
           cp "target/${TARGET}/release/@@appCrate@@.exe" "$staging/"
+# @end
           cp README.md LICENSE* "$staging/"
 # @if has_gui & themes
           # The theme catalog travels with the binary. It is compiled in,

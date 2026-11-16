@@ -12,7 +12,7 @@
 // Debug builds keep the console, which is where panics go while developing.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-//! Entry point for `@@name@@`.
+//! Entry point for `@@bin@@`.
 //!
 //! Deliberately thin: it parses the command line, loads the saved
 //! preferences and hands off. Everything else belongs to the library.

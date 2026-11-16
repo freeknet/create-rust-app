@@ -27,7 +27,7 @@ async fn run(args: &[&str]) -> anyhow::Result<(ExitCode, String)> {
 
 #[tokio::test]
 async fn the_default_action_greets() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@"]).await?;
+    let (code, out) = run(&["@@bin@@"]).await?;
     // @else
 
 /// Runs the program with `args` and returns its exit code and stdout.
@@ -39,7 +39,7 @@ fn run(args: &[&str]) -> anyhow::Result<(ExitCode, String)> {
 
 #[test]
 fn the_default_action_greets() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@"])?;
+    let (code, out) = run(&["@@bin@@"])?;
     // @end
     assert_eq!(code, SUCCESS, "a bare run succeeds");
     assert!(out.ends_with("!\n"), "one line: {out:?}");
@@ -50,11 +50,11 @@ fn the_default_action_greets() -> anyhow::Result<()> {
 // @if async_tokio
 #[tokio::test]
 async fn a_name_is_greeted() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@", "--name", "Ferris"]).await?;
+    let (code, out) = run(&["@@bin@@", "--name", "Ferris"]).await?;
     // @else
 #[test]
 fn a_name_is_greeted() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@", "--name", "Ferris"])?;
+    let (code, out) = run(&["@@bin@@", "--name", "Ferris"])?;
     // @end
     assert_eq!(code, SUCCESS, "a valid flag succeeds");
     assert!(out.contains("Ferris"), "--name is used: {out:?}");
@@ -64,11 +64,11 @@ fn a_name_is_greeted() -> anyhow::Result<()> {
 // @if async_tokio
 #[tokio::test]
 async fn an_unknown_flag_is_a_usage_error() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@", "--no-such-flag"]).await?;
+    let (code, out) = run(&["@@bin@@", "--no-such-flag"]).await?;
     // @else
 #[test]
 fn an_unknown_flag_is_a_usage_error() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@", "--no-such-flag"])?;
+    let (code, out) = run(&["@@bin@@", "--no-such-flag"])?;
     // @end
     assert_eq!(code, ExitCode::from(2), "usage errors exit 2");
     assert!(out.is_empty(), "nothing ran: {out:?}");
@@ -78,11 +78,11 @@ fn an_unknown_flag_is_a_usage_error() -> anyhow::Result<()> {
 // @if async_tokio
 #[tokio::test]
 async fn version_is_not_an_error() -> anyhow::Result<()> {
-    let (code, _) = run(&["@@name@@", "--version"]).await?;
+    let (code, _) = run(&["@@bin@@", "--version"]).await?;
     // @else
 #[test]
 fn version_is_not_an_error() -> anyhow::Result<()> {
-    let (code, _) = run(&["@@name@@", "--version"])?;
+    let (code, _) = run(&["@@bin@@", "--version"])?;
     // @end
     assert_eq!(code, SUCCESS, "--version exits 0");
     Ok(())
@@ -92,11 +92,11 @@ fn version_is_not_an_error() -> anyhow::Result<()> {
 // @if async_tokio
 #[tokio::test]
 async fn arguments_are_ignored_without_a_parser() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@", "--anything"]).await?;
+    let (code, out) = run(&["@@bin@@", "--anything"]).await?;
     // @else
 #[test]
 fn arguments_are_ignored_without_a_parser() -> anyhow::Result<()> {
-    let (code, out) = run(&["@@name@@", "--anything"])?;
+    let (code, out) = run(&["@@bin@@", "--anything"])?;
     // @end
     assert_eq!(code, SUCCESS, "every run succeeds");
     assert!(!out.is_empty(), "the default runs: {out:?}");
