@@ -2,7 +2,21 @@
 // Module:       @@module@@
 // Description:  The command line and what each command does.
 //
-// Dependencies: clap (derive) when selected; std::io for output
+// Dependencies: std::io for output
+// @if clap
+//               clap (derive) for parsing
+// @end
+// @if clap & http_ureq
+//               ureq for the fetch command
+// @elif clap & http_reqwest
+//               reqwest for the fetch command
+// @end
+// @if serde & config
+//               crate::config for the saved preferences
+// @end
+// @if clap & sqlite
+//               crate::db for the db command
+// @end
 // ============================================================================
 
 //! The command line, and the commands it dispatches to.

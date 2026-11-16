@@ -3,7 +3,13 @@
 // Description:  Logging setup: diagnostics to stderr, filtered by level, so
 //               stdout stays clean for the program's real output.
 //
-// Dependencies: the selected logging crate
+// @if log_env_logger
+// Dependencies: log + env_logger (RUST_LOG filters)
+// @elif log_tracing
+// Dependencies: tracing-subscriber (RUST_LOG filters via EnvFilter)
+// @else
+// Dependencies: log, with the minimal stderr logger defined here
+// @end
 // ============================================================================
 
 //! Logging setup.

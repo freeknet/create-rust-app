@@ -51,3 +51,53 @@ for (const preset of Object.keys(PRESETS)) {
     }
   });
 }
+
+/** The `// Dependencies:` block of a rendered banner, continuation lines included. */
+function dependencyBlock(content: string): string {
+  const lines = content.split('\n');
+  const start = lines.findIndex((line: string) => line.startsWith('// Dependencies:'));
+  if (start < 0) return '';
+  const block = [lines[start] ?? ''];
+  for (const line of lines.slice(start + 1)) {
+    if (!/^\/\/ {15}\S/.test(line)) break;
+    block.push(line);
+  }
+  return block.join('\n');
+}
+
+const BANNER_VARIANTS: [string, Record<string, unknown>][] = [
+  ['cli', {}],
+  ['cli', { crates: { async: 'tokio', http: 'reqwest', sqlite: true, logging: 'tracing' } }],
+  ['cli', { crates: { http: 'ureq', logging: 'log' } }],
+  ['minimal', {}],
+  ['tui', {}],
+  ['tui', { crates: { clap: false, logging: 'tracing' } }],
+  ['lib', {}],
+  ['lib', { crates: { thiserror: false } }],
+  ['rustaman', { crates: { clap: false } }],
+];
+
+test('banners name the crates the project uses, not the options it could have (#5)', async () => {
+  for (const [preset, extra] of BANNER_VARIANTS) {
+    const ctx = buildContext(resolveAnswers(preset, { name: 'deps-' + preset, ...extra }));
+    const plan = await buildPlan(ctx);
+    const where = preset + ' ' + JSON.stringify(extra);
+    for (const entry of plan) {
+      if (!entry.dest.endsWith('.rs') || !('content' in entry)) continue;
+      const block = dependencyBlock(entry.content);
+      assert.doesNotMatch(block, /\bselected\b/i, `${where}: ${entry.dest} describes options: ${block}`);
+    }
+    if (ctx.kind !== 'cli') continue;
+    // A CLI's lib.rs banner lists every runtime crate in Cargo.toml.
+    const cargo = plan.find((e: PlanEntry) => e.dest === 'Cargo.toml');
+    const lib = plan.find((e: PlanEntry) => e.dest === 'src/lib.rs');
+    assert.ok(cargo && 'content' in cargo && lib && 'content' in lib, where + ': Cargo.toml and lib.rs rendered');
+    const section = /\n\[dependencies\]\n([\s\S]*?)(?:\n\[|$)/.exec(cargo.content)?.[1] ?? '';
+    const crates = [...section.matchAll(/^([\w-]+)\s*=/gm)].map((m) => m[1] ?? '');
+    assert.ok(crates.length > 0, where + ': has dependencies');
+    const block = dependencyBlock(lib.content);
+    for (const name of crates) {
+      assert.match(block, new RegExp(`\\b${name}\\b`), `${where}: lib.rs banner names ${name}: ${block}`);
+    }
+  }
+});

@@ -6,7 +6,7 @@
 // @if clap
 // Dependencies: clap (derive)
 // @else
-// Dependencies: std only (a hand-rolled parser; clap was not selected)
+// Dependencies: std only (a hand-rolled parser, no clap)
 // @end
 // ============================================================================
 

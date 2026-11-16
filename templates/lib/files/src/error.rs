@@ -2,7 +2,11 @@
 // Module:       @@module@@
 // Description:  The crate's one error type and its `Result` alias.
 //
-// Dependencies: thiserror when selected; std otherwise
+// @if thiserror
+// Dependencies: thiserror (derives Display and Error)
+// @else
+// Dependencies: std only (Display and Error written by hand)
+// @end
 // ============================================================================
 
 //! The crate's one error type.

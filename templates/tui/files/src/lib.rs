@@ -3,7 +3,10 @@
 // Description:  The terminal app: argument parsing, the event loop, and the
 //               module graph it is built from.
 //
-// Dependencies: ratatui, crossterm, anyhow; clap when selected
+// Dependencies: ratatui + crossterm for the terminal, anyhow for errors
+// @if clap
+//               clap (derive) for the command line
+// @end
 // ============================================================================
 
 //! @@displayName@@: @@tagline@@
