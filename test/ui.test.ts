@@ -235,6 +235,13 @@ test('the framed review and the next box fit every terminal width, losing nothin
       } else {
         assert.ok(columns < Math.max(...cmds.map((l) => l.length)) + 8, `${columns}/${glyphSet}: unboxed only when it cannot fit`);
       }
+      // Notes are dropped before the frame is: with room for the commands alone, the box stays.
+      const noted = ['cargo run', 'cargo clippy --all-targets -- -D warnings   # the lint gate CI runs'];
+      const plain = ['cargo run', 'cargo clippy --all-targets -- -D warnings'];
+      const out = await captured(() => box(c, 'next', noted, plain));
+      const roomForPlain = Math.max(...plain.map((l) => l.length)) + 8 <= columns;
+      assert.equal(out.some((l) => l.includes(corner)), roomForPlain, `${columns}/${glyphSet}: boxed iff the compact lines fit`);
+      if (roomForPlain) for (const line of out) assert.ok(width(line) <= columns, `${columns}/${glyphSet} compact box: "${line}"`);
     }
   }
 });

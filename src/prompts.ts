@@ -52,9 +52,6 @@ const isGui = (a: Answers) => a.kind === 'gui' || a.kind === 'workspace';
 /** The review block: what will be generated, in human words, grouped and colour-keyed. */
 export function reviewLines(caps: Caps, a: Answers): { title: string; body: string } {
   const sep = glyphs(caps).sep;
-  // The body is drawn inside note(): label column + wrapped items + NOTE_FRAME must fit the terminal.
-  const label = Math.max(...['crates', 'app', 'guardrails', 'github', 'docs', 'then'].map((n) => n.length)) + 2;
-  const max = Math.max(8, Math.min(caps.columns, 100) - NOTE_FRAME - label);
   // Sentence-case words read as a list; keep acronyms and file names as written (CI, SECURITY.md).
   const soft = (l: string) => (/^[A-Z][a-z]/.test(l) ? l[0]?.toLowerCase() + l.slice(1) : l);
   const on = <K extends string>(cat: Record<K, Choice>, values: Record<K, boolean>, group?: string) =>
@@ -89,6 +86,9 @@ export function reviewLines(caps: Caps, a: Answers): { title: string; body: stri
     ['docs', STOPS[1] ?? '', on(TOOLING, a.tooling, 'docs')],
     ['then', STOPS[4] ?? '', then.length ? then : ['nothing']],
   ];
+  // The body is drawn inside note(): label column + wrapped items + NOTE_FRAME must fit the terminal.
+  const label = Math.max(...sections.map(([n]) => n.length)) + 2;
+  const max = Math.max(8, Math.min(caps.columns, 100) - NOTE_FRAME - label);
   const rows = sections
     .filter(([, , items]) => items.length)
     .flatMap(([name, color, items]) => wrap(items.join(sep), max).map((line, i) =>

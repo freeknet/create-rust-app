@@ -80,18 +80,21 @@ export async function note(caps: Caps, title: string, body: string) {
 }
 
 /**
- * A boxed block, fitted to its content: `╭─ title ──╮ │ … │ ╰──╯`. When the box would be wider
- * than the terminal, the lines go on the rail unboxed instead: a wrapped box edge is worse than none.
+ * A boxed block, fitted to its content: `╭─ title ──╮ │ … │ ╰──╯`. When it would be wider than the
+ * terminal, `compact` (shorter lines, if given) is tried next, and failing that the lines go on the
+ * rail unboxed: a wrapped box edge is worse than none.
  */
-export function box(caps: Caps, title: string, lines: string[]) {
+export function box(caps: Caps, title: string, lines: string[], compact?: string[]) {
   const r = rail(caps);
-  if (Math.max(width(title) + 4, ...lines.map((l) => width(l))) + BOX_FRAME > caps.columns) {
-    write(`${r.bar()}\n${[dim(caps, title), ...lines].map((l) => `${r.bar()}  ${l}`).join('\n')}\n`);
+  const content = (ls: string[]) => Math.max(width(title) + 4, ...ls.map((l) => width(l)));
+  if (content(lines) + BOX_FRAME > caps.columns) {
+    if (compact && content(compact) + BOX_FRAME <= caps.columns) { box(caps, title, compact); return; }
+    write(`${r.bar()}\n${[dim(caps, title), ...(compact ?? lines)].map((l) => `${r.bar()}  ${l}`).join('\n')}\n`);
     return;
   }
   const edge = (s: string) => hex(caps, COLORS.live, s);
   // inner = content width + 2 spaces of padding each side.
-  const inner = Math.max(width(title) + 4, ...lines.map((l) => width(l))) + 4;
+  const inner = content(lines) + 4;
   const top = `${edge(`${r.g.tl}${r.g.h}`)} ${title} ${edge(`${r.g.h.repeat(Math.max(1, inner - width(title) - 3))}${r.g.tr}`)}`;
   const body = lines.map((l) => `${edge(r.g.v)}  ${l}${' '.repeat(Math.max(0, inner - 2 - width(l)))}${edge(r.g.v)}`);
   const bottom = edge(`${r.g.bl}${r.g.h.repeat(inner)}${r.g.br}`);
