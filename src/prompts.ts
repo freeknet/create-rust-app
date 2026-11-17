@@ -8,7 +8,7 @@
  * never asked again.
  */
 import { isCancel } from '@clack/core';
-import { cancel, note, text } from './ui/rail.ts';
+import { NOTE_FRAME, NOTE_TITLE_FRAME, cancel, note, text } from './ui/rail.ts';
 import { glyphs } from './ui/glyphs.ts';
 import { PRESETS, resolveAnswers } from './presets.ts';
 import { effectiveAnswers, validateBin, validateName } from './context.ts';
@@ -16,7 +16,7 @@ import { dim, hex, bold } from './ui/rainbow.ts';
 import { pick, pickMany } from './ui/choose.ts';
 import type { Item } from './ui/choose.ts';
 import { STOPS } from './ui/theme.ts';
-import { wrap } from './ui/tty.ts';
+import { clip, width, wrap } from './ui/tty.ts';
 import { ASYNC, CRATE_TOGGLES, DESKTOP, FEATURES, HTTP, KINDS, LICENSES, LOGGING, STACKS, TOOLING, grouped } from './ui/labels.ts';
 import type { Choice } from './ui/labels.ts';
 import type { Answers, Caps, PartialAnswers } from './types.ts';
@@ -51,8 +51,10 @@ const isGui = (a: Answers) => a.kind === 'gui' || a.kind === 'workspace';
 
 /** The review block: what will be generated, in human words, grouped and colour-keyed. */
 export function reviewLines(caps: Caps, a: Answers): { title: string; body: string } {
-  const max = Math.max(40, Math.min(caps.columns, 100) - 18);
   const sep = glyphs(caps).sep;
+  // The body is drawn inside note(): label column + wrapped items + NOTE_FRAME must fit the terminal.
+  const label = Math.max(...['crates', 'app', 'guardrails', 'github', 'docs', 'then'].map((n) => n.length)) + 2;
+  const max = Math.max(8, Math.min(caps.columns, 100) - NOTE_FRAME - label);
   // Sentence-case words read as a list; keep acronyms and file names as written (CI, SECURITY.md).
   const soft = (l: string) => (/^[A-Z][a-z]/.test(l) ? l[0]?.toLowerCase() + l.slice(1) : l);
   const on = <K extends string>(cat: Record<K, Choice>, values: Record<K, boolean>, group?: string) =>
@@ -87,15 +89,25 @@ export function reviewLines(caps: Caps, a: Answers): { title: string; body: stri
     ['docs', STOPS[1] ?? '', on(TOOLING, a.tooling, 'docs')],
     ['then', STOPS[4] ?? '', then.length ? then : ['nothing']],
   ];
-  const label = Math.max(...sections.map(([n]) => n.length)) + 2;
-  const body = sections
+  const rows = sections
     .filter(([, , items]) => items.length)
     .flatMap(([name, color, items]) => wrap(items.join(sep), max).map((line, i) =>
-      `${i === 0 ? hex(caps, color, name.padEnd(label)) : ' '.repeat(label)}${line}`))
-    .join('\n');
+      `${i === 0 ? hex(caps, color, name.padEnd(label)) : ' '.repeat(label)}${line}`));
+
+  // Title: name, then kind / edition / licence while they fit; whatever doesn't moves to the
+  // top of the body, so a narrow terminal loses no information and no line wraps.
+  const room = Math.max(8, caps.columns - NOTE_TITLE_FRAME);
   const bin = effectiveAnswers(a).bin;
-  const title = `${bold(caps, a.name)}${dim(caps, `${bin ? ` (runs as ${bin})` : ''}${sep}${KINDS[a.kind]}${sep}Rust ${a.edition}${sep}${LICENSES[a.license].label}`)}`;
-  return { title, body };
+  let name = `${a.name}${bin ? ` (runs as ${bin})` : ''}`;
+  const ellipsis = glyphs(caps).ellipsis;
+  if (width(name) > room) name = `${clip(name, room - width(ellipsis))}${ellipsis}`;
+  const facts = [KINDS[a.kind], `Rust ${a.edition}`, LICENSES[a.license].label];
+  let shown = facts.length;
+  while (shown > 0 && width(name + facts.slice(0, shown).map((f) => sep + f).join('')) > room) shown--;
+  const rest = facts.slice(shown);
+  const top = rest.length ? wrap(rest.join(sep), max).map((line) => `${' '.repeat(label)}${dim(caps, line)}`) : [];
+  const title = `${bold(caps, name)}${dim(caps, facts.slice(0, shown).map((f) => sep + f).join(''))}`;
+  return { title, body: [...top, ...rows].join('\n') };
 }
 
 /** Explicit command-line answers only; the preset's answers stay editable defaults. */

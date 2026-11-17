@@ -83,7 +83,8 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
   caps: Caps; answers: Answers; plan: PlanEntry[]; target: string; shown: string; force: boolean;
 }) {
   const { dim, paint } = await import('./ui/rainbow.ts');
-  const { box, cancel, log, outro, tasks } = await import('./ui/rail.ts');
+  const { BOX_FRAME, box, cancel, log, outro, tasks } = await import('./ui/rail.ts');
+  const { width } = await import('./ui/tty.ts');
   const { glyphs } = await import('./ui/glyphs.ts');
   const { cargoFetch } = await import('./post/cargo.ts');
   const { reproduceCommand } = await import('./reproduce.ts');
@@ -133,7 +134,10 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
 
   const cmds = nextCommands(answers, shown);
   const pad = Math.max(...cmds.map(([c]) => c.length)) + 3;
-  box(caps, 'next', cmds.map(([c, note]) => (note ? `${c.padEnd(pad)}${dim(caps, `# ${note}`)}` : c)));
+  const noted = cmds.map(([c, note]) => (note ? `${c.padEnd(pad)}${dim(caps, `# ${note}`)}` : c));
+  // The notes are the first thing to go when the box would not fit the terminal.
+  const fits = Math.max(...noted.map((l) => width(l))) + BOX_FRAME <= caps.columns;
+  box(caps, 'next', fits ? noted : cmds.map(([c]) => c));
   log(caps, [dim(caps, 'again without prompts:'), dim(caps, reproduceCommand(answers, shown === '.' ? '.' : undefined))]);
   await outro(caps, 'build something luminous');
   return true;

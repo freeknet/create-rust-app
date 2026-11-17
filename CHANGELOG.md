@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The review panel and the next-steps box fit narrow terminals: below about 60 columns their right
+  edges used to wrap onto the next line. Title facts that don't fit move into the panel, and the
+  box drops its notes, then its frame, rather than overflow.
 - `Cargo.lock` is part of the scaffold's first commit: `cargo fetch` now runs before `git init`,
   so a fresh project no longer starts with an untracked lockfile.
 - `--json` reports the features a kind actually generates: desktop features read `false` for

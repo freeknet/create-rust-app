@@ -59,7 +59,16 @@ export function text(caps: Caps, o: {
   return prompt.prompt() as Promise<string | symbol>;
 }
 
-/** A titled panel on the rail: `◇  title ───╮`, body lines, `├───╯`. */
+/**
+ * Columns note() adds around its content: `│  ` before each line, the padding and `│` after.
+ * A line of width w draws w + NOTE_FRAME wide; the title line needs NOTE_TITLE_FRAME around it.
+ */
+export const NOTE_FRAME = 6;
+export const NOTE_TITLE_FRAME = 8;
+/** Columns box() adds around its widest line (rail, edges and padding). */
+export const BOX_FRAME = 8;
+
+/** A titled panel on the rail: `◇  title ───╮`, body lines, `├───╯`. Callers fit content to NOTE_FRAME. */
 export async function note(caps: Caps, title: string, body: string) {
   const r = rail(caps);
   const lines = body.split('\n');
@@ -70,9 +79,16 @@ export async function note(caps: Caps, title: string, body: string) {
   await cascade(caps, [r.bar(), top, ...mid, bottom]);
 }
 
-/** A boxed block, fitted to its content: `╭─ title ──╮ │ … │ ╰──╯`. */
+/**
+ * A boxed block, fitted to its content: `╭─ title ──╮ │ … │ ╰──╯`. When the box would be wider
+ * than the terminal, the lines go on the rail unboxed instead: a wrapped box edge is worse than none.
+ */
 export function box(caps: Caps, title: string, lines: string[]) {
   const r = rail(caps);
+  if (Math.max(width(title) + 4, ...lines.map((l) => width(l))) + BOX_FRAME > caps.columns) {
+    write(`${r.bar()}\n${[dim(caps, title), ...lines].map((l) => `${r.bar()}  ${l}`).join('\n')}\n`);
+    return;
+  }
   const edge = (s: string) => hex(caps, COLORS.live, s);
   // inner = content width + 2 spaces of padding each side.
   const inner = Math.max(width(title) + 4, ...lines.map((l) => width(l))) + 4;
