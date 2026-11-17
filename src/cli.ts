@@ -133,7 +133,8 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
 
   const cmds = nextCommands(answers, shown);
   const pad = Math.max(...cmds.map(([c]) => c.length)) + 3;
-  box(caps, 'next', cmds.map(([c, note]) => (note ? `${c.padEnd(pad)}${dim(caps, `# ${note}`)}` : c)));
+  // The notes are the first thing to go when the box would not fit the terminal.
+  box(caps, 'next', cmds.map(([c, note]) => (note ? `${c.padEnd(pad)}${dim(caps, `# ${note}`)}` : c)), cmds.map(([c]) => c));
   log(caps, [dim(caps, 'again without prompts:'), dim(caps, reproduceCommand(answers, shown === '.' ? '.' : undefined))]);
   await outro(caps, 'build something luminous');
   return true;

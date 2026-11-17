@@ -195,3 +195,53 @@ test('animated spinner redraws and restores the cursor', async () => {
   assert.ok(out.endsWith('\x1b[?25h'));
   assert.ok(stripVTControlCharacters(out).includes('✔ cargo check passed'));
 });
+
+/** Everything a call writes to stdout, as plain lines. */
+async function captured(run: () => unknown): Promise<string[]> {
+  const original = process.stdout.write.bind(process.stdout);
+  let out = '';
+  process.stdout.write = ((chunk: string | Uint8Array) => { out += String(chunk); return true; }) as typeof process.stdout.write;
+  try { await run(); } finally { process.stdout.write = original; }
+  return stripVTControlCharacters(out).split('\n').filter((l) => l !== '');
+}
+
+test('the framed review and the next box fit every terminal width, losing nothing', async () => {
+  const { note, box } = await import('../src/ui/rail.ts');
+  const variants = [
+    ctx,
+    buildContext(resolveAnswers('strobe', { name: 'a-rather-long-project-name', bin: 'arlpn' })),
+    buildContext(resolveAnswers('lib', { name: 'tiny' })),
+  ];
+  for (const columns of [30, 40, 44, 50, 58, 60, 80, 100, 120]) {
+    for (const glyphSet of ['full', 'ascii'] as const) {
+      const c = caps({ columns, glyphs: glyphSet });
+      for (const a of variants) {
+        const { title, body } = reviewLines(c, a);
+        const lines = await captured(() => note(c, title, body));
+        for (const line of lines) assert.ok(width(line) <= columns, `${columns}/${glyphSet} ${a.name}: "${line}" is ${width(line)} wide`);
+        // Facts squeezed out of the title wrap into the body, word by word.
+        const words = new Set(lines.join(' ').split(/\s+/));
+        const licence = a.license === 'MIT+CommonsClause' ? 'MIT + Commons Clause' : a.license;
+        for (const word of [a.edition, ...licence.split(' ')]) {
+          assert.ok(words.has(word), `${columns}/${glyphSet} ${a.name}: "${word}" still shown`);
+        }
+      }
+      // The box either fits, or isn't drawn: a long command may soft-wrap, a box edge must not.
+      const cmds = ['cd a-rather-long-project-name', 'cargo clippy --all-targets -- -D warnings'];
+      const boxed = await captured(() => box(c, 'next', cmds));
+      const corner = glyphSet === 'ascii' ? '+' : '╭';
+      if (boxed.some((line) => line.includes(corner))) {
+        for (const line of boxed) assert.ok(width(line) <= columns, `${columns}/${glyphSet} box: "${line}" is ${width(line)} wide`);
+      } else {
+        assert.ok(columns < Math.max(...cmds.map((l) => l.length)) + 8, `${columns}/${glyphSet}: unboxed only when it cannot fit`);
+      }
+      // Notes are dropped before the frame is: with room for the commands alone, the box stays.
+      const noted = ['cargo run', 'cargo clippy --all-targets -- -D warnings   # the lint gate CI runs'];
+      const plain = ['cargo run', 'cargo clippy --all-targets -- -D warnings'];
+      const out = await captured(() => box(c, 'next', noted, plain));
+      const roomForPlain = Math.max(...plain.map((l) => l.length)) + 8 <= columns;
+      assert.equal(out.some((l) => l.includes(corner)), roomForPlain, `${columns}/${glyphSet}: boxed iff the compact lines fit`);
+      if (roomForPlain) for (const line of out) assert.ok(width(line) <= columns, `${columns}/${glyphSet} compact box: "${line}"`);
+    }
+  }
+});
