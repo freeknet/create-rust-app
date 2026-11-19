@@ -38,6 +38,7 @@ test/*.test.ts             node --test
   edition: '2024' | '2021', msrv: '1.98', toolchain: '1.99.1', accent: '#00e5ff',
   kind: 'cli' | 'gui' | 'tui' | 'lib' | 'workspace',
   guiStack: 'eframe' | 'winit-glow',
+  themeBase: string,  // a shipped theme id from templates/gui/files/assets/themes.toml ('' without a GUI)
   crates:   { errors: 'anyhow', thiserror: bool, logging: 'log'|'env_logger'|'tracing',
               serde: bool, async: 'none'|'tokio', http: 'none'|'ureq'|'reqwest',
               sqlite: bool, clap: bool },
@@ -66,13 +67,16 @@ It then adds: `crate` (snake), `Name` (Pascal), `NAME` (SCREAMING),
 - every true boolean in crates/features/tooling by its key: `thiserror`, `serde`, `sqlite`, `clap`,
   `themes`, `tray`, `ci`, `release`, …
 - `has_gui` (kind gui, or workspace — the workspace app crate is a GUI), `has_bin` (kind ≠ lib),
+  `base_dark` / `base_light` (the `--base` theme's mode; GUI kinds only),
   `custom_bin` (`--bin` names the executable differently from its crate; a `[[bin]]` table is written),
   `workspace` (kind workspace), `single` (not workspace)
 
 ### Tokens (`@@x@@`)
 
 `name bin crate Name NAME appCrate appCrateSnake displayName tagline author github email year license edition msrv
-toolchain accent module`. `@@module@@` is computed per file by `moduleFor(dest, ctx)`. `@@bin@@` is the
+toolchain accent module`, plus `baseName baseMode baseApp basePanel baseRaised baseHover baseBorder
+baseText baseTextMuted baseDanger baseWarning baseSuccess baseSpan baseAccentRgb`: the `--base` theme's
+fields as read from `themes.toml` by `src/gen/themes.ts`, filled into the signature theme. `@@module@@` is computed per file by `moduleFor(dest, ctx)`. `@@bin@@` is the
 command users type (`--bin`, else the project name); where the executable's file name matters (release
 packaging) templates use `@@bin@@` under `custom_bin` and `@@appCrate@@` otherwise.
 Unknown tokens throw (so a typo fails tests loudly).

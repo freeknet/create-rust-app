@@ -52,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--base <theme>`: lay the signature theme's accent on any shipped theme's surfaces, e.g.
+  `--base graphite` for neutral greys behind media. The default (`midnight`) is unchanged, and the
+  readability tests check the result in the generated project.
 - `--without demo`: a GUI project starts from one empty page wired through the same page, shortcut
   and command-palette machinery, instead of the overview cards, palette and about pages. Pages are
   now additive: `Ctrl+1…9` and the palette follow `Page::ALL`, and `docs/ARCHITECTURE.md` explains

@@ -15,6 +15,8 @@ export interface Answers {
   accent: string;
   kind: 'cli' | 'gui' | 'tui' | 'lib' | 'workspace';
   guiStack: 'eframe' | 'winit-glow';
+  /** Shipped theme whose surfaces the signature theme uses (`--base`); '' when there is no GUI. */
+  themeBase: string;
   crates: {
     errors: 'anyhow'; thiserror: boolean; logging: 'log' | 'env_logger' | 'tracing';
     serde: boolean; async: 'none' | 'tokio'; http: 'none' | 'ureq' | 'reqwest';
@@ -40,7 +42,9 @@ export type PartialAnswers = {
 
 export type TokenKey = 'name' | 'bin' | 'crate' | 'Name' | 'NAME' | 'appCrate' | 'appCrateSnake'
   | 'displayName' | 'tagline' | 'author' | 'github' | 'email' | 'year' | 'license'
-  | 'edition' | 'msrv' | 'toolchain' | 'accent';
+  | 'edition' | 'msrv' | 'toolchain' | 'accent'
+  | 'baseName' | 'baseMode' | 'baseApp' | 'basePanel' | 'baseRaised' | 'baseHover' | 'baseBorder'
+  | 'baseText' | 'baseTextMuted' | 'baseDanger' | 'baseWarning' | 'baseSuccess' | 'baseSpan' | 'baseAccentRgb';
 
 export interface Ctx extends Answers {
   crate: string;

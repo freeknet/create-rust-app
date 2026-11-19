@@ -41,6 +41,7 @@ export function reproduceCommand(raw: Answers, dir?: string): string {
     if (a.crates[k] !== base.crates[k]) parts.push('--set', `crates.${k}=${a.crates[k]}`);
   }
   if (a.guiStack !== base.guiStack && (a.kind === 'gui' || a.kind === 'workspace')) parts.push('--gui', a.guiStack);
+  if (a.themeBase !== base.themeBase) parts.push('--base', a.themeBase);
   for (const k of ['edition', 'msrv', 'toolchain', 'license'] as const) {
     if (a[k] !== base[k]) parts.push(`--${k}`, quote(a[k]));
   }

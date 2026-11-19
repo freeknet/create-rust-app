@@ -23,8 +23,9 @@
 //!
 //! ## The signature theme
 //!
-//! [`signature`] is a dark theme whose accent is the colour this project
-//! was scaffolded with ([`crate::ACCENT`]). An accent that would fail the
+//! [`signature`] lays the colour this project was scaffolded with
+//! ([`crate::ACCENT`]) on the surfaces of the built-in @@baseName@@ theme
+//! (chosen with `--base` at scaffold time). An accent that would fail the
 //! readability rules is walked through a few lightnesses at the same hue,
 //! and if none of them reads, the theme keeps its own default — so the app
 //! cannot open unreadable, whatever colour was picked.
@@ -361,32 +362,34 @@ impl Palette {
     }
 }
 
-/// The base the signature theme is built on: a deep blue-black.
+/// The base the signature theme is built on: the @@baseName@@ theme's
+/// surfaces, text and status colours, with `accent` laid on them.
 fn signature_spec(accent: Rgb) -> ThemeSpec {
     ThemeSpec {
         id: "signature".to_string(),
         name: "Signature".to_string(),
-        mode: Mode::Dark,
-        app: "#0a0c11".to_string(),
-        panel: "#11141c".to_string(),
-        raised: "#1a1e28".to_string(),
-        hover: "#242936".to_string(),
-        border: "#333a4a".to_string(),
+        mode: Mode::@@baseMode@@,
+        app: "@@baseApp@@".to_string(),
+        panel: "@@basePanel@@".to_string(),
+        raised: "@@baseRaised@@".to_string(),
+        hover: "@@baseHover@@".to_string(),
+        border: "@@baseBorder@@".to_string(),
         accent: accent.to_hex(),
-        text: "#e9edf5".to_string(),
-        text_muted: "#98a3b8".to_string(),
-        danger: "#ff5c7a".to_string(),
-        warning: "#ffb347".to_string(),
-        success: "#4ade80".to_string(),
-        rainbow_span: Some(280.0),
+        text: "@@baseText@@".to_string(),
+        text_muted: "@@baseTextMuted@@".to_string(),
+        danger: "@@baseDanger@@".to_string(),
+        warning: "@@baseWarning@@".to_string(),
+        success: "@@baseSuccess@@".to_string(),
+        rainbow_span: Some(@@baseSpan@@),
     }
 }
 
 /// The accent the signature theme falls back to when the scaffolded one
-/// cannot be made readable on its surfaces.
-const FALLBACK_ACCENT: Rgb = Rgb::new(0x4c, 0xc9, 0xf0);
+/// cannot be made readable on its surfaces: the @@baseName@@ theme's own.
+const FALLBACK_ACCENT: Rgb = Rgb::new(@@baseAccentRgb@@);
 
-/// The signature theme: the dark base with [`crate::ACCENT`] as its accent.
+/// The signature theme: the @@baseName@@ base with [`crate::ACCENT`] as its
+/// accent.
 ///
 /// See the module docs: an accent that fails the rules is tried at a few
 /// lightnesses of the same hue before the base's own accent is used.
@@ -395,7 +398,12 @@ pub fn signature() -> Palette {
     let seed = Oklch::from_rgb(crate::ACCENT);
     let candidates = std::iter::once(crate::ACCENT)
         .chain(
+            // Lighter tries read on dark surfaces, darker ones on light.
+            // @if base_light
+            [0.48, 0.42, 0.36, 0.54]
+            // @else
             [0.72, 0.78, 0.84, 0.66]
+            // @end
                 .into_iter()
                 .map(|lightness| Oklch::new(lightness, seed.c, seed.h).to_rgb()),
         )
@@ -415,9 +423,12 @@ pub fn signature() -> Palette {
     last.unwrap_or_else(emergency)
 }
 
-/// A palette built from literals, for the one path where deriving failed.
+/// A palette built from literals (Midnight's, whatever the base), for the
+/// one path where deriving failed: the tests above keep it unreachable.
 fn emergency() -> Palette {
-    let accent = FALLBACK_ACCENT;
+    // Midnight's own accent, not FALLBACK_ACCENT: that one belongs to the
+    // chosen base, and these surfaces are Midnight's whatever the base.
+    let accent = Rgb::new(0x4c, 0xc9, 0xf0);
     Palette {
         id: "signature".to_string(),
         name: "Signature".to_string(),

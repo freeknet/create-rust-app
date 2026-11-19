@@ -11,6 +11,7 @@ import { isCancel } from '@clack/core';
 import { NOTE_FRAME, NOTE_TITLE_FRAME, cancel, note, text } from './ui/rail.ts';
 import { glyphs } from './ui/glyphs.ts';
 import { PRESETS, resolveAnswers } from './presets.ts';
+import { shippedThemes } from './gen/themes.ts';
 import { effectiveAnswers, validateBin, validateName } from './context.ts';
 import { dim, hex, bold } from './ui/rainbow.ts';
 import { pick, pickMany } from './ui/choose.ts';
@@ -163,7 +164,7 @@ export async function ask(partial: PartialAnswers, caps: Caps, targetCheck: (nam
 async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => string | null, repick: () => Promise<Answers>): Promise<Answers> {
   const sections: Item<string>[] = ([
     { value: 'crates', label: 'Crates', hint: 'logging, async, HTTP, serde, SQLite…' },
-    ...(isGui(a) ? [{ value: 'app', label: 'App', hint: 'GUI runtime, themes, tray, palette…' }] : []),
+    ...(isGui(a) ? [{ value: 'app', label: 'App', hint: 'GUI runtime, theme base, tray, palette…' }] : []),
     { value: 'tooling', label: 'Tooling', hint: 'CI, releases, guardrails, docs' },
     { value: 'rust', label: 'Licence + Rust', hint: `${LICENSES[a.license].label} · edition ${a.edition} · MSRV ${a.msrv} · pin ${a.toolchain}` },
     { value: 'after', label: 'After creating', hint: 'git, cargo fetch / check, open editor' },
@@ -200,6 +201,10 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
 
   if (which === 'app') {
     out.guiStack = got(await pick(caps, { message: 'GUI runtime', initialValue: out.guiStack, options: items(STACKS, ['eframe', 'winit-glow']) }));
+    out.themeBase = got(await pick(caps, {
+      message: 'Signature theme surfaces (your accent on these)', initialValue: out.themeBase,
+      options: shippedThemes().map((t) => ({ value: t.id, label: t.name, hint: `${t.mode} · ${t.app} / ${t.panel}` })),
+    }));
     const keys = Object.values(grouped(DESKTOP)).flat();
     const picked = got(await pickMany(caps, {
       message: 'App features',

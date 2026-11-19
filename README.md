@@ -91,6 +91,7 @@ create-rust-app [dir] [options]
 | `--preset <p>` | `rustaman` `strobe` `cli` `tui` `lib` `minimal`, or `custom` for no preset (the defaults) |
 | `--kind <k>` | `cli` `gui` `tui` `lib` `workspace` |
 | `--gui <stack>` | `eframe` (wgpu) or `winit-glow` (winit + glutin + egui_glow) |
+| `--base <theme>` | Surfaces the signature theme lays your accent on: any shipped theme id, e.g. `graphite` for neutral greys (default `midnight`) |
 | `--edition <e>` | `2024` or `2021` |
 | `--msrv <v>` | `rust-version` in Cargo.toml (default `1.98`) |
 | `--toolchain <v>` | Exact channel pinned in `rust-toolchain.toml` and CI (default `1.99.1`) |
@@ -99,6 +100,7 @@ create-rust-app [dir] [options]
 | `--github <user>` | GitHub handle for CODEOWNERS and repository links |
 | `--accent <#hex>` | Accent colour for GUI themes (default `#00e5ff`) |
 | `--with a,b` | Turn on features / tooling, e.g. `--with tray,commandPalette`, or `--with subcommands` for a CLI built on a clap `Subcommand` enum |
+| `--without demo` | Start a desktop app from one empty page instead of the overview / palette / about showcase |
 | `--without a,b` | Turn them off, e.g. `--without release,dependabot` |
 | `--set <key.path=value>` | Set any answer directly (repeatable), e.g. `--set tagline="Fast grep"`, `--set crates.async=tokio`. The only way to set `tagline` / `displayName` without prompts. `true`/`false` become booleans |
 | `-y`, `--yes` | Accept defaults for anything not given; no prompts |

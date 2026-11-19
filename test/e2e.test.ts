@@ -174,3 +174,25 @@ test('--without demo starts the GUI from one empty page (#18)', async () => {
   const cli = buildContext(resolveAnswers('cli', { name: 'c', features: { demo: true } }));
   assert.ok(!cli.flags.has('demo'), 'demo is a desktop-only feature');
 });
+
+test('--base lays the signature theme on a shipped theme\'s surfaces (#19)', async () => {
+  const { shippedThemes } = await import('../src/gen/themes.ts');
+  const themes = shippedThemes();
+  assert.ok(themes.length >= 2 && themes.some((t) => t.id === 'midnight'), 'the catalog parses');
+  const theme = (base: string) => buildPlan(buildContext(resolveAnswers('rustaman', { name: 'b', themeBase: base })))
+    .then((plan) => plan.find((e: PlanEntry) => e.dest === 'src/theme/mod.rs'))
+    .then((e) => (e && 'content' in e ? e.content : ''));
+  const graphite = themes.find((t) => t.id === 'graphite');
+  assert.ok(graphite, 'graphite ships');
+  const src = await theme('graphite');
+  assert.match(src, new RegExp(`app: "${graphite.app}"\\.to_string\\(\\)`), 'surfaces come from the base');
+  assert.match(src, /mode: Mode::Dark,/);
+  assert.match(src, /const FALLBACK_ACCENT: Rgb = Rgb::new\(0x62, 0xb6, 0xf5\);/, 'the base\'s own accent is the fallback');
+  const light = await theme('daylight');
+  assert.match(light, /mode: Mode::Light,/);
+  assert.match(light, /\[0\.48, 0\.42, 0\.36, 0\.54\]/, 'darker accent retries on a light base');
+  // The default reproduces the literals the template used to hard-code.
+  const midnight = await theme('midnight');
+  assert.match(midnight, /app: "#0a0c11"\.to_string\(\)[\s\S]*rainbow_span: Some\(280\.0\)/);
+  assert.match(midnight, /const FALLBACK_ACCENT: Rgb = Rgb::new\(0x4c, 0xc9, 0xf0\);/);
+});

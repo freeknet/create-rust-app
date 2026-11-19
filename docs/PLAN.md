@@ -168,6 +168,7 @@ debug = "line-tables-only"
 | identity | name (kebab `^[a-z][a-z0-9-]*$`), displayName, tagline, author ★`Lawrence Norton`, github ★`lnorton89`, email, license ★`MIT` / `MIT+CommonsClause` / `Apache-2.0` / `MIT OR Apache-2.0`, edition ★`2024`/`2021`, msrv ★`1.98`, toolchain ★`1.99.1` |
 | kind | `cli` / `gui` ★ / `tui` / `lib` / `workspace` |
 | gui stack | `eframe` ★ (rustaman: eframe + wgpu) / `winit-glow` (strobe) |
+| theme base | any shipped theme id: `midnight` ★ / `graphite` / … (the surfaces the signature theme lays the accent on) |
 | crates | errors: anyhow ★ (+ thiserror ★ for lib/workspace); logging: `log` ★gui / `env_logger` ★cli / `tracing`; serde+toml ★; async: none ★ / tokio; http: none ★ / ureq / reqwest; sqlite: off ★ / rusqlite bundled; clap ★ (everything but lib) |
 | features (gui) | themes ★, brand ★, motion ★, icons ★, config ★, winres ★ (icon+manifest+version), tray, singleInstance, commandPalette, screenshotExample, demo ★ (off: one empty page instead of the overview / palette / about showcase) |
 | features (cli) | subcommands (clap `Subcommand` enum, `tool <command> …`, replaces the greeting demo; needs clap) |
@@ -188,7 +189,7 @@ all tooling), `tui` (ratatui + crossterm), `lib` (thiserror, no bin, docs.rs met
 - Runtime deps: `@clack/core` (prompt state machines and key handling) and `picocolors`. Everything
   else is hand-rolled: arg parsing with `node:util` `parseArgs`, gradients in `src/ui/rainbow.ts`, the
   banner in `src/ui/banner.ts`, rendering in `src/ui/{rail,choose,motion}.ts`.
-- Flags: `create-rust-app [dir] --name --bin --preset <p> --kind --gui <eframe|winit-glow> --edition --msrv
+- Flags: `create-rust-app [dir] --name --bin --preset <p> --kind --gui <eframe|winit-glow> --base --edition --msrv
   --toolchain --license --author --github --accent --with a,b --without a,b --set key.path=value
   --yes/-y --no-git --no-fetch --cargo-check --no-cargo-check --open <code|cursor> --dry-run --json
   --no-color --quiet --force --help --version`. Non-TTY implies `--yes`.

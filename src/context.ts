@@ -1,4 +1,5 @@
 import type { Answers, Ctx, TokenKey } from './types.ts';
+import { DEFAULT_BASE, shippedTheme } from './gen/themes.ts';
 /** Answers → Ctx (see docs/CONTRACTS.md). */
 
 export const NAME_RE = /^[a-z][a-z0-9-]*$/;
@@ -52,6 +53,7 @@ export function effectiveAnswers(a: Answers): Answers {
   if (!hasGui) {
     for (const f of GUI_ONLY_FEATURES) out.features[f] = false;
     out.tooling.unsafeCheck = false;
+    out.themeBase = '';
   }
   // The GUI kinds always ship a config file; the CLI only when serde is on to read it. A library
   // leaves config to the app embedding it, and the TUI template has none.
@@ -72,6 +74,8 @@ export function buildContext(raw: Answers): Ctx {
   if (err) throw new Error(`invalid project name "${a.name}": ${err}`);
   const binErr = a.bin ? validateBin(a.bin) : null;
   if (binErr) throw new Error(`invalid binary name "${a.bin}": ${binErr}`);
+  const base = shippedTheme(a.themeBase || DEFAULT_BASE);
+  if (!base) throw new Error(`unknown theme base "${a.themeBase}"`);
   const workspace = a.kind === 'workspace';
   const hasGui = a.kind === 'gui' || workspace;
 
@@ -86,6 +90,7 @@ export function buildContext(raw: Answers): Ctx {
   }
   if (a.kind !== 'lib') flags.add('has_bin');
   if (a.bin) flags.add('custom_bin');
+  if (hasGui) flags.add(`base_${base.mode}`);
   const lf = LICENSE_FLAG[/** @type {keyof typeof LICENSE_FLAG} */ (a.license as keyof typeof LICENSE_FLAG)];
   if (!lf) throw new Error(`unknown license ${a.license}`);
   flags.add(lf);
@@ -122,6 +127,21 @@ export function buildContext(raw: Answers): Ctx {
     msrv: a.msrv,
     toolchain: a.toolchain,
     accent: a.accent,
+    // The --base theme's stated colours, for the signature theme (theme/mod.rs).
+    baseName: base.name,
+    baseMode: base.mode === 'light' ? 'Light' : 'Dark',
+    baseApp: base.app,
+    basePanel: base.panel,
+    baseRaised: base.raised,
+    baseHover: base.hover,
+    baseBorder: base.border,
+    baseText: base.text,
+    baseTextMuted: base.text_muted,
+    baseDanger: base.danger,
+    baseWarning: base.warning,
+    baseSuccess: base.success,
+    baseSpan: Number.isInteger(base.rainbow_span) ? `${base.rainbow_span}.0` : String(base.rainbow_span),
+    baseAccentRgb: [1, 3, 5].map((i) => `0x${base.accent.slice(i, i + 2).toLowerCase()}`).join(', '),
   };
 
   return {
