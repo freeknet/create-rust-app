@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- A release build of a GUI app run from a terminal prints its `--help`, `--version` and usage
-  errors: with arguments it attaches to the parent console first (`src/win/console.rs`).
-  Explorer launches are unchanged.
+- A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
+  and headless output: it attaches to the parent console just before printing
+  (`src/win/console.rs`). Opening the window never attaches, so closing the terminal doesn't close
+  the app, and Explorer launches are unchanged.
 - The review panel and the next-steps box fit narrow terminals: below about 60 columns their right
   edges used to wrap onto the next line. Title facts that don't fit move into the panel, and the
   box drops its notes, then its frame, rather than overflow.

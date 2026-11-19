@@ -14,6 +14,10 @@
 //! written to nowhere. Attaching to the parent's console fixes that, and
 //! does nothing when there is no parent console to attach to.
 //!
+//! Attach only to print: an attached process is closed with the console
+//! and receives its Ctrl+C, so `main` never attaches before opening the
+//! window.
+//!
 //! One quirk of the platform remains: the shell does not wait for a
 //! Windows-subsystem program, so its prompt can come back before the
 //! output. Press Enter for a fresh prompt.
