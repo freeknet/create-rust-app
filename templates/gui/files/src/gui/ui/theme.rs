@@ -247,7 +247,11 @@ mod tests {
         let visuals = visuals(&theme);
         assert_eq!(visuals.panel_fill, rgb(theme.panel));
         assert_eq!(visuals.override_text_color, Some(rgb(theme.text)));
-        assert!(visuals.dark_mode, "the signature theme is dark");
+        assert_eq!(
+            visuals.dark_mode,
+            theme.mode == crate::theme::Mode::Dark,
+            "egui's dark mode follows the theme's"
+        );
     }
 
     #[test]

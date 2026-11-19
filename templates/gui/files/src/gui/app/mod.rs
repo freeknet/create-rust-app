@@ -28,6 +28,7 @@ use crate::theme::Palette;
 /// A page of the app, in sidebar order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum Page {
+    // @if demo
     /// The landing page: a grid of cards.
     #[default]
     Overview,
@@ -35,19 +36,33 @@ pub enum Page {
     Palette,
     /// The mark, the version and the shortcuts.
     About,
+    // @else
+    /// The one page the app starts with. Rename it, and add pages beside
+    /// it (see "Adding a page" in docs/ARCHITECTURE.md).
+    #[default]
+    Home,
+    // @end
 }
 
 impl Page {
     /// Every page, in sidebar order.
+    // @if demo
     pub const ALL: [Self; 3] = [Self::Overview, Self::Palette, Self::About];
+    // @else
+    pub const ALL: [Self; 1] = [Self::Home];
+    // @end
 
     /// The name the page is shown under.
     #[must_use]
     pub fn label(self) -> &'static str {
         match self {
+            // @if demo
             Self::Overview => "Overview",
             Self::Palette => "Palette",
             Self::About => "About",
+            // @else
+            Self::Home => "Home",
+            // @end
         }
     }
 
@@ -55,9 +70,13 @@ impl Page {
     #[must_use]
     pub fn key(self) -> &'static str {
         match self {
+            // @if demo
             Self::Overview => "overview",
             Self::Palette => "palette",
             Self::About => "about",
+            // @else
+            Self::Home => "home",
+            // @end
         }
     }
 
@@ -71,9 +90,13 @@ impl Page {
     #[must_use]
     pub fn glyph(self) -> ui::Glyph {
         match self {
+            // @if demo
             Self::Overview => glyph::OVERVIEW,
             Self::Palette => glyph::PALETTE,
             Self::About => glyph::ABOUT,
+            // @else
+            Self::Home => glyph::HOME,
+            // @end
         }
     }
 }
@@ -106,6 +129,7 @@ pub enum Action {
     /// Close the window and quit.
     Quit,
 }
+// @if demo
 
 /// One card on the overview page.
 #[derive(Clone, Copy, Debug)]
@@ -164,6 +188,7 @@ pub const CARDS: &[Card] = &[
         progress: 0.40,
     },
 ];
+// @end
 
 /// The application state.
 pub struct App {
@@ -173,8 +198,10 @@ pub struct App {
     pub sidebar_collapsed: bool,
     /// Whether the settings card is open.
     pub settings_open: bool,
+    // @if demo
     /// The selected overview card, by index into [`CARDS`].
     pub selected_card: Option<usize>,
+    // @end
     /// The palette everything is drawn in.
     pub theme: Palette,
     // @if themes
@@ -222,7 +249,9 @@ impl App {
                 .unwrap_or_default(),
             sidebar_collapsed: config.sidebar_collapsed.unwrap_or(false),
             settings_open: false,
+            // @if demo
             selected_card: None,
+            // @end
             theme,
             // @if themes
             catalog,
@@ -255,7 +284,9 @@ impl App {
             page: Page::default(),
             sidebar_collapsed: false,
             settings_open: false,
+            // @if demo
             selected_card: None,
+            // @end
             theme,
             // @if themes
             catalog,
@@ -430,6 +461,7 @@ mod tests {
         app.apply(&ctx, Action::ToggleSidebar);
         assert_eq!(app.sidebar_collapsed, before);
     }
+    // @if demo
 
     #[test]
     fn every_card_has_something_to_say() {
@@ -439,6 +471,7 @@ mod tests {
             assert!((0.0..=1.0).contains(&card.progress), "{}", card.title);
         }
     }
+    // @end
     // @if themes
 
     #[test]

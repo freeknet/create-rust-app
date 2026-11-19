@@ -168,9 +168,10 @@ debug = "line-tables-only"
 | identity | name (kebab `^[a-z][a-z0-9-]*$`), displayName, tagline, author ★`Lawrence Norton`, github ★`lnorton89`, email, license ★`MIT` / `MIT+CommonsClause` / `Apache-2.0` / `MIT OR Apache-2.0`, edition ★`2024`/`2021`, msrv ★`1.98`, toolchain ★`1.99.1` |
 | kind | `cli` / `gui` ★ / `tui` / `lib` / `workspace` |
 | gui stack | `eframe` ★ (rustaman: eframe + wgpu) / `winit-glow` (strobe) |
+| theme base | any shipped theme id: `midnight` ★ / `graphite` / … (the surfaces the signature theme lays the accent on) |
 | crates | errors: anyhow ★ (+ thiserror ★ for lib/workspace); logging: `log` ★gui / `env_logger` ★cli / `tracing`; serde+toml ★; async: none ★ / tokio; http: none ★ / ureq / reqwest; sqlite: off ★ / rusqlite bundled; clap ★ (everything but lib) |
-| features (gui) | themes ★, brand ★, motion ★, icons ★, config ★, winres ★ (icon+manifest+version), tray, singleInstance, commandPalette, screenshotExample |
-| features (cli) | subcommands (clap `Subcommand` enum, `tool <command> …`, replaces the greeting demo; needs clap) |
+| features (gui) | themes ★, brand ★, motion ★, icons ★, config ★, winres ★ (icon+manifest+version), tray, singleInstance, commandPalette, screenshotExample, demo ★ (off: one empty page instead of the overview / palette / about showcase) |
+| features (cli, gui) | subcommands (needs clap). cli: a clap `Subcommand` enum replaces the greeting demo. gui: optional headless jobs (`app themes`, `app paths`); a bare run opens the window |
 | tooling | ci ★, release ★, cargoDeny ★, dependabot ★, toolchainPin ★, agentDocs ★ (AGENTS.md + CLAUDE.md), headerCheck ★, unsafeCheck ★ (gui), changelogGen ★, issueTemplates ★, codeowners ★, securityMd ★ |
 | theme | accent ★`#00e5ff` |
 | post | git ★ (init + initial commit `feat: scaffold <name> with create-rust-app`), cargoCheck ★ if cargo is on PATH, open: none ★ / code / cursor |
@@ -188,7 +189,7 @@ all tooling), `tui` (ratatui + crossterm), `lib` (thiserror, no bin, docs.rs met
 - Runtime deps: `@clack/core` (prompt state machines and key handling) and `picocolors`. Everything
   else is hand-rolled: arg parsing with `node:util` `parseArgs`, gradients in `src/ui/rainbow.ts`, the
   banner in `src/ui/banner.ts`, rendering in `src/ui/{rail,choose,motion}.ts`.
-- Flags: `create-rust-app [dir] --name --bin --preset <p> --kind --gui <eframe|winit-glow> --edition --msrv
+- Flags: `create-rust-app [dir] --name --bin --preset <p> --kind --gui <eframe|winit-glow> --base --edition --msrv
   --toolchain --license --author --github --accent --with a,b --without a,b --set key.path=value
   --yes/-y --no-git --no-fetch --cargo-check --no-cargo-check --open <code|cursor> --dry-run --json
   --no-color --quiet --force --help --version`. Non-TTY implies `--yes`.

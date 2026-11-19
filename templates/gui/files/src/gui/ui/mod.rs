@@ -59,12 +59,17 @@ pub mod glyph {
     // @if icons
     use crate::icon::Icon;
 
+    // @if demo
     /// The overview page.
     pub const OVERVIEW: Glyph = Icon::Grid;
     /// The palette page.
     pub const PALETTE: Glyph = Icon::Palette;
     /// The about page.
     pub const ABOUT: Glyph = Icon::Info;
+    // @else
+    /// The home page.
+    pub const HOME: Glyph = Icon::Grid;
+    // @end
     /// Settings.
     pub const SETTINGS: Glyph = Icon::Settings;
     /// The sidebar toggle.
@@ -73,6 +78,7 @@ pub mod glyph {
     pub const CLOSE: Glyph = Icon::Close;
     /// The command palette.
     pub const COMMAND: Glyph = Icon::Command;
+    // @if demo
     /// A card: speed.
     pub const BOLT: Glyph = Icon::Bolt;
     /// A card: structure.
@@ -85,14 +91,20 @@ pub mod glyph {
     pub const FOLDER: Glyph = Icon::Folder;
     /// A card: you.
     pub const SUN: Glyph = Icon::Sun;
+    // @end
     // @else
 
+    // @if demo
     /// The overview page.
     pub const OVERVIEW: Glyph = 'O';
     /// The palette page.
     pub const PALETTE: Glyph = 'P';
     /// The about page.
     pub const ABOUT: Glyph = 'A';
+    // @else
+    /// The home page.
+    pub const HOME: Glyph = 'H';
+    // @end
     /// Settings.
     pub const SETTINGS: Glyph = 'S';
     /// The sidebar toggle.
@@ -101,6 +113,7 @@ pub mod glyph {
     pub const CLOSE: Glyph = '×';
     /// The command palette.
     pub const COMMAND: Glyph = '>';
+    // @if demo
     /// A card: speed.
     pub const BOLT: Glyph = 'F';
     /// A card: structure.
@@ -113,6 +126,7 @@ pub mod glyph {
     pub const FOLDER: Glyph = 'S';
     /// A card: you.
     pub const SUN: Glyph = 'Y';
+    // @end
     // @end
 }
 
@@ -173,9 +187,13 @@ pub fn draw(app: &mut App, ui: &mut Ui) -> Vec<Action> {
                         .show(ui, |ui| {
                             enter_page(ui, app.page);
                             match app.page {
+                                // @if demo
                                 Page::Overview => overview(app, ui),
                                 Page::Palette => palette(app, ui, &mut actions),
                                 Page::About => about(app, ui),
+                                // @else
+                                Page::Home => home(app, ui, &mut actions),
+                                // @end
                             }
                         });
                 });
@@ -202,7 +220,7 @@ fn shortcuts(ui: &Ui, actions: &mut Vec<Action>) {
         if command && input.key_pressed(Key::B) {
             actions.push(Action::ToggleSidebar);
         }
-        for (key, page) in [Key::Num1, Key::Num2, Key::Num3].into_iter().zip(Page::ALL) {
+        for (key, page) in PAGE_KEYS.into_iter().zip(Page::ALL) {
             if command && input.key_pressed(key) {
                 actions.push(Action::Go(page));
             }
@@ -210,12 +228,30 @@ fn shortcuts(ui: &Ui, actions: &mut Vec<Action>) {
     });
 }
 
+/// Ctrl+1, Ctrl+2, … open the pages in sidebar order, so a new page gets
+/// its shortcut (and its command palette entry) without further wiring.
+const PAGE_KEYS: [Key; 9] = [
+    Key::Num1,
+    Key::Num2,
+    Key::Num3,
+    Key::Num4,
+    Key::Num5,
+    Key::Num6,
+    Key::Num7,
+    Key::Num8,
+    Key::Num9,
+];
+
 /// The shortcuts, as data, so the about page and the handler above cannot
 /// drift apart without the test below noticing.
 pub const SHORTCUTS: &[(&str, &str)] = &[
     ("Ctrl+,", "Open settings"),
     ("Ctrl+B", "Collapse or expand the sidebar"),
+    // @if demo
     ("Ctrl+1…3", "Switch page"),
+    // @else
+    ("Ctrl+1", "Switch page"),
+    // @end
     // @if commandPalette
     ("Ctrl+K", "Open the command palette"),
     // @end
@@ -249,6 +285,7 @@ fn heading(app: &App, ui: &mut Ui, title: &str, subtitle: &str) {
     widgets::muted(ui, &app.theme, subtitle);
     ui.add_space(SPACE_LG);
 }
+// @if demo
 
 /// The overview page: a grid of cards.
 fn overview(app: &mut App, ui: &mut Ui) {
@@ -410,6 +447,26 @@ fn about(app: &App, ui: &mut Ui) {
             }
         });
 }
+// @else
+
+/// The home page: the app's one page, and the place to start drawing it.
+fn home(app: &App, ui: &mut Ui, actions: &mut Vec<Action>) {
+    let theme = &app.theme;
+    heading(app, ui, crate::NAME, crate::TAGLINE);
+    widgets::muted(
+        ui,
+        theme,
+        "This page is yours to fill. Add more beside it: docs/ARCHITECTURE.md shows how.",
+    );
+    ui.add_space(SPACE_MD);
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = SPACE_SM;
+        if widgets::button(ui, theme, "Open settings", widgets::Emphasis::Secondary).clicked() {
+            actions.push(Action::OpenSettings);
+        }
+    });
+}
+// @end
 
 #[cfg(test)]
 mod tests {
@@ -417,10 +474,18 @@ mod tests {
 
     #[test]
     fn every_page_has_a_numbered_shortcut() {
-        assert_eq!(
-            Page::ALL.len(),
-            3,
-            "update the Ctrl+1…3 shortcut and SHORTCUTS"
+        assert!(
+            Page::ALL.len() <= PAGE_KEYS.len(),
+            "more pages than Ctrl+1…9 can reach"
+        );
+        let expected = match Page::ALL.len() {
+            1 => "Ctrl+1".to_string(),
+            count => format!("Ctrl+1…{count}"),
+        };
+        assert!(
+            SHORTCUTS.iter().any(|(keys, _)| *keys == expected),
+            "SHORTCUTS should list {expected} for {} pages",
+            Page::ALL.len()
         );
     }
 

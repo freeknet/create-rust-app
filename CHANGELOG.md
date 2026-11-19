@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
+  and headless output: it attaches to the parent console just before printing
+  (`src/win/console.rs`). Opening the window never attaches, so closing the terminal doesn't close
+  the app, and Explorer launches are unchanged.
 - The review panel and the next-steps box fit narrow terminals: below about 60 columns their right
   edges used to wrap onto the next line. Title facts that don't fit move into the panel, and the
   box drops its notes, then its frame, rather than overflow.
@@ -49,6 +53,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--with subcommands` on desktop apps: `app <job>` runs a headless job (`themes`, `paths` to start
+  with) and exits, a bare run opens the window as before, and `tests/cli.rs` covers both paths.
+- `--base <theme>`: lay the signature theme's accent on any shipped theme's surfaces, e.g.
+  `--base graphite` for neutral greys behind media. The default (`midnight`) is unchanged, and the
+  readability tests check the result in the generated project.
+- `--without demo`: a GUI project starts from one empty page wired through the same page, shortcut
+  and command-palette machinery, instead of the overview cards, palette and about pages. Pages are
+  now additive: `Ctrl+1…9` and the palette follow `Page::ALL`, and `docs/ARCHITECTURE.md` explains
+  adding one.
 - `--with subcommands`: a `cli` built on a clap `Subcommand` enum (no wildcard dispatch) with
   matching integration tests, instead of the greeting demo.
 - `--bin <name>`: an executable named differently from its crate. Writes `[[bin]]` and follows

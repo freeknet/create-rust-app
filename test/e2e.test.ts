@@ -103,7 +103,7 @@ test('banners name the crates the project uses, not the options it could have (#
   }
 });
 
-test('--with subcommands swaps in the subcommand CLI, only for the cli kind with clap (#9)', async () => {
+test('--with subcommands swaps in the subcommand CLI for the cli kind with clap, and leaves a TUI alone (#9)', async () => {
   const plan = async (preset: string, extra: Record<string, unknown>) =>
     buildPlan(buildContext(resolveAnswers(preset, { name: 'sub-' + preset, ...extra })));
   const text = (entries: PlanEntry[], dest: string) => {
@@ -153,4 +153,67 @@ test('--bin names the executable everywhere it is named, and only there (#8)', a
     const p = await plan(preset, { bin });
     assert.ok(!p.some((e: PlanEntry) => 'content' in e && /\[\[bin\]\]/.test(e.content)), `${preset} --bin ${bin}: no [[bin]] needed`);
   }
+});
+
+test('--without demo starts the GUI from one empty page (#18)', async () => {
+  const text = (entries: PlanEntry[], dest: string) => {
+    const e = entries.find((x: PlanEntry) => x.dest === dest);
+    return e && 'content' in e ? e.content : '';
+  };
+  const shell = await buildPlan(buildContext(resolveAnswers('rustaman', { name: 'shell', features: { demo: false, commandPalette: true } })));
+  const app = text(shell, 'src/gui/app/mod.rs');
+  const ui = text(shell, 'src/gui/ui/mod.rs');
+  assert.match(app, /pub const ALL: \[Self; 1\] = \[Self::Home\];/, 'one page');
+  assert.doesNotMatch(app + ui, /CARDS|selected_card|Overview|fn palette\(|fn about\(/, 'no demo content left');
+  assert.match(ui, /Page::Home => home\(app, ui, &mut actions\)/, 'the page is drawn');
+  assert.match(ui, /\("Ctrl\+1", "Switch page"\)/, 'shortcut list matches one page');
+  assert.match(text(shell, 'docs/ARCHITECTURE.md'), /## Adding a page[\s\S]*command palette gets a "Go to" entry/, 'docs explain adding pages');
+
+  const demo = await buildPlan(buildContext(resolveAnswers('rustaman', { name: 'demo' })));
+  assert.match(text(demo, 'src/gui/app/mod.rs'), /pub const CARDS: &\[Card\]/, 'the showcase stays the default');
+  const cli = buildContext(resolveAnswers('cli', { name: 'c', features: { demo: true } }));
+  assert.ok(!cli.flags.has('demo'), 'demo is a desktop-only feature');
+});
+
+test('--base lays the signature theme on a shipped theme\'s surfaces (#19)', async () => {
+  const { shippedThemes } = await import('../src/gen/themes.ts');
+  const themes = shippedThemes();
+  assert.ok(themes.length >= 2 && themes.some((t) => t.id === 'midnight'), 'the catalog parses');
+  const theme = (base: string) => buildPlan(buildContext(resolveAnswers('rustaman', { name: 'b', themeBase: base })))
+    .then((plan) => plan.find((e: PlanEntry) => e.dest === 'src/theme/mod.rs'))
+    .then((e) => (e && 'content' in e ? e.content : ''));
+  const graphite = themes.find((t) => t.id === 'graphite');
+  assert.ok(graphite, 'graphite ships');
+  const src = await theme('graphite');
+  assert.match(src, new RegExp(`app: "${graphite.app}"\\.to_string\\(\\)`), 'surfaces come from the base');
+  assert.match(src, /mode: Mode::Dark,/);
+  assert.match(src, /const FALLBACK_ACCENT: Rgb = Rgb::new\(0x62, 0xb6, 0xf5\);/, 'the base\'s own accent is the fallback');
+  const light = await theme('daylight');
+  assert.match(light, /mode: Mode::Light,/);
+  assert.match(light, /\[0\.48, 0\.42, 0\.36, 0\.54\]/, 'darker accent retries on a light base');
+  // The default reproduces the literals the template used to hard-code.
+  const midnight = await theme('midnight');
+  assert.match(midnight, /app: "#0a0c11"\.to_string\(\)[\s\S]*rainbow_span: Some\(280\.0\)/);
+  assert.match(midnight, /const FALLBACK_ACCENT: Rgb = Rgb::new\(0x4c, 0xc9, 0xf0\);/);
+});
+
+test('--with subcommands on a desktop app adds headless jobs beside the window (#17)', async () => {
+  const text = (entries: PlanEntry[], dest: string) => {
+    const e = entries.find((x: PlanEntry) => x.dest === dest);
+    return e && 'content' in e ? e.content : '';
+  };
+  const gui = await buildPlan(buildContext(resolveAnswers('rustaman', { name: 'g', features: { subcommands: true } })));
+  assert.match(text(gui, 'src/cli.rs'), /#\[command\(subcommand\)\]\n    pub command: Option<Command>,/, 'optional subcommand');
+  assert.match(text(gui, 'src/cli.rs'), /pub enum Command \{[\s\S]*Themes,[\s\S]*Paths,/, 'example jobs');
+  const main = text(gui, 'src/main.rs');
+  assert.match(main, /if let Some\(command\) = cli\.command\.take\(\) \{\n        borrow_console\(\);\n        return headless\(command\);/, 'headless dispatch, printing to the terminal');
+  assert.doesNotMatch(main, /args_os\(\)\.len\(\)/, 'never attaches just because there are arguments');
+  assert.ok(main.indexOf('headless(command)') < main.indexOf('fn run('), 'dispatch happens before the window');
+  assert.ok(gui.some((e: PlanEntry) => e.dest === 'tests/cli.rs'), 'both paths are tested');
+
+  const plain = await buildPlan(buildContext(resolveAnswers('rustaman', { name: 'g' })));
+  assert.ok(!plain.some((e: PlanEntry) => e.dest === 'tests/cli.rs'), 'off by default');
+  assert.doesNotMatch(text(plain, 'src/main.rs'), /headless/, 'no headless path by default');
+  const noClap = buildContext(resolveAnswers('rustaman', { name: 'g', crates: { clap: false }, features: { subcommands: true } }));
+  assert.ok(!noClap.flags.has('subcommands'), 'needs clap');
 });

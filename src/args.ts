@@ -3,10 +3,11 @@ import { existsSync } from 'node:fs';
 import { DEFAULTS, PRESETS } from './presets.ts';
 import { validateBin, validateName } from './context.ts';
 import type { PartialAnswers } from './types.ts';
+import { shippedThemes } from './gen/themes.ts';
 
 /** @type {Record<string, import('node:util').ParseArgsOptionConfig>} */
 const OPTIONS: NonNullable<import('node:util').ParseArgsConfig['options']> = {};
-for (const name of ['name', 'bin', 'preset', 'kind', 'gui', 'edition', 'msrv', 'toolchain', 'license', 'author', 'github', 'accent', 'open']) {
+for (const name of ['name', 'bin', 'preset', 'kind', 'gui', 'base', 'edition', 'msrv', 'toolchain', 'license', 'author', 'github', 'accent', 'open']) {
   OPTIONS[name] = { type: 'string' };
 }
 for (const name of ['with', 'without', 'set']) OPTIONS[name] = { type: 'string', multiple: true };
@@ -44,6 +45,7 @@ Object.assign(SHORT_NAMES, {
 const CHOICES: Record<string, string[]> = {
   preset: [...Object.keys(PRESETS), 'custom'],
   kind: ['cli', 'gui', 'tui', 'lib', 'workspace'], guiStack: ['eframe', 'winit-glow'],
+  themeBase: shippedThemes().map((theme) => theme.id),
   license: ['MIT', 'MIT+CommonsClause', 'Apache-2.0', 'MIT OR Apache-2.0'],
   edition: ['2024', '2021'], 'crates.errors': ['anyhow'],
   'crates.logging': ['log', 'env_logger', 'tracing'], 'crates.async': ['none', 'tokio'],
@@ -146,6 +148,7 @@ export function parseArgv(argv: string[]) {
     else if (name === 'no-fetch') setAnswer(overrides, 'post.fetch', false);
     else if (name === 'open') setAnswer(overrides, 'post.open', String(value));
     else if (name === 'gui') setAnswer(overrides, 'guiStack', String(value));
+    else if (name === 'base') setAnswer(overrides, 'themeBase', String(value));
     else if (Object.hasOwn(DEFAULTS, name)) setAnswer(overrides, name, String(value));
   }
   return { dir: parsed.positionals[0], flags, overrides: overrides as PartialAnswers };
@@ -169,7 +172,7 @@ async function choiceHelp(caps: unknown): Promise<string[]> {
   const tint = (c: string, t: string) => rainbow.hex?.(caps, c, t) ?? t;
   const sections: [string, string, Record<string, { label: string; hint: string }>][] = [
     ['crates', '#ff6ec7', { ...labels.CRATE_TOGGLES, tokio: { label: 'tokio', hint: labels.ASYNC.tokio.hint }, ureq: { label: 'ureq', hint: labels.HTTP.ureq.hint }, reqwest: { label: 'reqwest', hint: labels.HTTP.reqwest.hint }, tracing: { label: 'tracing', hint: labels.LOGGING.tracing.hint }, env_logger: { label: 'env_logger', hint: labels.LOGGING.env_logger.hint } }],
-    ['command line (cli kind, with clap)', '#b6ff6e', { subcommands: labels.FEATURES.subcommands }],
+    ['command line (cli and desktop kinds, with clap)', '#b6ff6e', { subcommands: labels.FEATURES.subcommands }],
     ['app features (desktop kinds)', '#ff9f6e', labels.DESKTOP],
     ['tooling', '#ffd36e', labels.TOOLING],
   ];
@@ -195,6 +198,7 @@ export async function renderHelp(caps: unknown) {
     '  --preset <preset>      ' + Object.keys(PRESETS).join(' | ') + ' | custom',
     '  --kind <kind>          cli | gui | tui | lib | workspace',
     '  --gui <stack>          eframe | winit-glow',
+    '  --base <theme>         Surfaces for the signature theme: ' + shippedThemes().map((theme) => theme.id).join(' | '),
     '  --author <name>        Author name     --github <user>  GitHub owner',
     '  --license <license>    MIT | MIT+CommonsClause | Apache-2.0 | "MIT OR Apache-2.0"',
     '  --edition <edition>    2024 | 2021      --msrv <version>  Minimum Rust version',

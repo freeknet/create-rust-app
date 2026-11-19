@@ -21,14 +21,14 @@
 # fails is a failing test; a user theme that fails is reported in Settings
 # and not loaded.
 #
-# The signature theme (built from the colour the project was scaffolded
-# with) is always first and is defined in code. `id` is persisted in the
-# config file. Never rename one.
+# The signature theme (the colour the project was scaffolded with, on the
+# @@baseName@@ surfaces) is always first and is defined in code. `id` is
+# persisted in the config file. Never rename one.
 
 # --------------------------------------------------------------- dark
 
-# A deep blue-black with a cyan accent: the signature theme's base, with
-# the accent it falls back to.
+# A deep blue-black with a cyan accent. The signature theme's default base
+# (`--base` picks another).
 [[theme]]
 id = "midnight"
 name = "Midnight"

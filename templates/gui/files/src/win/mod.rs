@@ -28,6 +28,7 @@
 //! `src/win/`, in test code, or two of them in one function.
 // @end
 
+pub mod console;
 pub mod dialog;
 // @if singleInstance
 pub mod single_instance;

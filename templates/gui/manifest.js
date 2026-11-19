@@ -19,6 +19,7 @@ const OWNED = [
   [/^assets\/[^/]+\.manifest$/, 'winres'],
   [/^assets\/[^/]+\.ico$/, 'winres'],
   [/^examples\/screenshot\.rs$/, 'screenshotExample'],
+  [/^tests\/cli\.rs$/, 'subcommands'],
   // The eframe runner; the gui-glow group ships its own file at this dest.
   [/^src\/gui\/run\.rs$/, 'gui_eframe'],
 ];

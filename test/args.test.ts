@@ -70,3 +70,8 @@ test('parseArgv: --bin takes a command name and refuses bad ones (#8)', () => {
   assert.throws(() => parseArgv(['--bin', 'nul']), /reserved device name on Windows/);
   assert.equal(parseArgv(['--bin', 'console']).overrides.bin, 'console', 'only exact device names are refused');
 });
+
+test('parseArgv: --base takes a shipped theme id (#19)', () => {
+  assert.equal(parseArgv(['--base', 'graphite']).overrides.themeBase, 'graphite');
+  assert.throws(() => parseArgv(['--base', 'nope']), /Invalid themeBase "nope". Choose: midnight, graphite/);
+});
