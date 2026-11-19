@@ -52,6 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--without demo`: a GUI project starts from one empty page wired through the same page, shortcut
+  and command-palette machinery, instead of the overview cards, palette and about pages. Pages are
+  now additive: `Ctrl+1…9` and the palette follow `Page::ALL`, and `docs/ARCHITECTURE.md` explains
+  adding one.
 - `--with subcommands`: a `cli` built on a clap `Subcommand` enum (no wildcard dispatch) with
   matching integration tests, instead of the greeting demo.
 - `--bin <name>`: an executable named differently from its crate. Writes `[[bin]]` and follows

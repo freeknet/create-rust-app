@@ -39,7 +39,7 @@ const LICENSE_FLAG = {
 
 /** App features only a desktop GUI generates (kind `gui`, or the `workspace` app crate). */
 export const GUI_ONLY_FEATURES = ['themes', 'brand', 'motion', 'icons', 'winres', 'tray', 'singleInstance',
-  'commandPalette', 'screenshotExample'] as const satisfies readonly (keyof Answers['features'])[];
+  'commandPalette', 'screenshotExample', 'demo'] as const satisfies readonly (keyof Answers['features'])[];
 
 /**
  * The answers as they apply to this kind of project: options the kind never generates read

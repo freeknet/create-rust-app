@@ -42,7 +42,7 @@ test/*.test.ts             node --test
               serde: bool, async: 'none'|'tokio', http: 'none'|'ureq'|'reqwest',
               sqlite: bool, clap: bool },
   features: { themes, brand, motion, icons, config, winres, tray, singleInstance,
-              commandPalette, screenshotExample, subcommands }, // all bool; subcommands: cli + clap only
+              commandPalette, screenshotExample, demo, subcommands }, // all bool; subcommands: cli + clap only
   tooling:  { ci, release, cargoDeny, dependabot, toolchainPin, agentDocs, headerCheck,
               unsafeCheck, changelogGen, issueTemplates, codeowners, securityMd }, // all bool
   post:     { git: bool, cargoCheck: bool, open: 'none'|'code'|'cursor' },

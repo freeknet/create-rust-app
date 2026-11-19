@@ -23,7 +23,7 @@ export interface Answers {
   features: {
     themes: boolean; brand: boolean; motion: boolean; icons: boolean; config: boolean;
     winres: boolean; tray: boolean; singleInstance: boolean; commandPalette: boolean;
-    screenshotExample: boolean; subcommands: boolean;
+    screenshotExample: boolean; demo: boolean; subcommands: boolean;
   };
   tooling: {
     ci: boolean; release: boolean; cargoDeny: boolean; dependabot: boolean;

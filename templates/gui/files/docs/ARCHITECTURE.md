@@ -77,6 +77,18 @@ the module needs `unsafe` to use it.
 
 ## Adding a page
 
-1. Add a variant to `Page` in `gui/app/mod.rs` (label, key, glyph).
-2. Draw it in `gui/ui/mod.rs`'s `draw` match.
-3. Bump the `Ctrl+1…N` shortcut and `SHORTCUTS`; the tests will remind you.
+Pages are additive: one variant, one function, and the rest follows.
+
+1. Add a variant to `Page` in `gui/app/mod.rs`, to `Page::ALL` in sidebar order, and to
+   its `label`, `key` and `glyph` matches. The key is what the config saves, so never
+   rename one once shipped.
+2. Write a `fn my_page(app: &App, ui: &mut Ui, actions: &mut Vec<Action>)` in
+   `gui/ui/mod.rs` and call it from the `match app.page` in `draw`. Draw only; anything
+   that changes state is pushed as an `Action` and carried out by `App::apply`.
+3. That's all the wiring. The sidebar lists `Page::ALL`, `Ctrl+1…9` open pages in that
+   order, and the headless test draws every page.
+<!-- @if commandPalette -->
+   The command palette gets a "Go to" entry too.
+<!-- @end -->
+   Update the `Ctrl+1…N` line in `SHORTCUTS`: `every_page_has_a_numbered_shortcut` fails
+   until you do.

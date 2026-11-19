@@ -154,3 +154,23 @@ test('--bin names the executable everywhere it is named, and only there (#8)', a
     assert.ok(!p.some((e: PlanEntry) => 'content' in e && /\[\[bin\]\]/.test(e.content)), `${preset} --bin ${bin}: no [[bin]] needed`);
   }
 });
+
+test('--without demo starts the GUI from one empty page (#18)', async () => {
+  const text = (entries: PlanEntry[], dest: string) => {
+    const e = entries.find((x: PlanEntry) => x.dest === dest);
+    return e && 'content' in e ? e.content : '';
+  };
+  const shell = await buildPlan(buildContext(resolveAnswers('rustaman', { name: 'shell', features: { demo: false, commandPalette: true } })));
+  const app = text(shell, 'src/gui/app/mod.rs');
+  const ui = text(shell, 'src/gui/ui/mod.rs');
+  assert.match(app, /pub const ALL: \[Self; 1\] = \[Self::Home\];/, 'one page');
+  assert.doesNotMatch(app + ui, /CARDS|selected_card|Overview|fn palette\(|fn about\(/, 'no demo content left');
+  assert.match(ui, /Page::Home => home\(app, ui, &mut actions\)/, 'the page is drawn');
+  assert.match(ui, /\("Ctrl\+1", "Switch page"\)/, 'shortcut list matches one page');
+  assert.match(text(shell, 'docs/ARCHITECTURE.md'), /## Adding a page[\s\S]*command palette gets a "Go to" entry/, 'docs explain adding pages');
+
+  const demo = await buildPlan(buildContext(resolveAnswers('rustaman', { name: 'demo' })));
+  assert.match(text(demo, 'src/gui/app/mod.rs'), /pub const CARDS: &\[Card\]/, 'the showcase stays the default');
+  const cli = buildContext(resolveAnswers('cli', { name: 'c', features: { demo: true } }));
+  assert.ok(!cli.flags.has('demo'), 'demo is a desktop-only feature');
+});

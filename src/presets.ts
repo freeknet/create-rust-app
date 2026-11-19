@@ -17,7 +17,7 @@ export const DEFAULTS: Answers = Object.freeze<Answers>({
   kind: 'gui',
   guiStack: 'eframe',
   crates: { errors: 'anyhow', thiserror: false, logging: 'log', serde: true, async: 'none', http: 'none', sqlite: false, clap: true },
-  features: { themes: true, brand: true, motion: true, icons: true, config: true, winres: true, tray: false, singleInstance: false, commandPalette: false, screenshotExample: false, subcommands: false },
+  features: { themes: true, brand: true, motion: true, icons: true, config: true, winres: true, tray: false, singleInstance: false, commandPalette: false, screenshotExample: false, demo: true, subcommands: false },
   tooling: { ci: true, release: true, cargoDeny: true, dependabot: true, toolchainPin: true, agentDocs: true, headerCheck: true, unsafeCheck: true, changelogGen: true, issueTemplates: true, codeowners: true, securityMd: true },
   // fetch (seconds) by default; a full check of a GUI project compiles eframe/wgpu (minutes).
   post: { git: true, fetch: true, cargoCheck: false, open: 'none' },

@@ -20,6 +20,7 @@ export const FEATURES: Record<FeatureKey, Choice> = {
   commandPalette: { label: 'Command palette', hint: 'Ctrl+K fuzzy search over every action', group: 'behaviour' },
   winres: { label: 'Windows resources', hint: 'exe icon, manifest, version info', group: 'packaging' },
   screenshotExample: { label: 'Screenshot example', hint: 'renders the UI headlessly to PNG', group: 'packaging' },
+  demo: { label: 'Demo pages', hint: 'overview cards, palette and about pages; off = one empty page', group: 'content' },
   subcommands: { label: 'Subcommands', hint: 'clap subcommands instead of the greeting demo', group: 'cli' },
 };
 
