@@ -206,7 +206,8 @@ test('--with subcommands on a desktop app adds headless jobs beside the window (
   assert.match(text(gui, 'src/cli.rs'), /#\[command\(subcommand\)\]\n    pub command: Option<Command>,/, 'optional subcommand');
   assert.match(text(gui, 'src/cli.rs'), /pub enum Command \{[\s\S]*Themes,[\s\S]*Paths,/, 'example jobs');
   const main = text(gui, 'src/main.rs');
-  assert.match(main, /if let Some\(command\) = cli\.command\.take\(\) \{\n        return headless\(command\);/, 'headless dispatch');
+  assert.match(main, /if let Some\(command\) = cli\.command\.take\(\) \{\n        borrow_console\(\);\n        return headless\(command\);/, 'headless dispatch, printing to the terminal');
+  assert.doesNotMatch(main, /args_os\(\)\.len\(\)/, 'never attaches just because there are arguments');
   assert.ok(main.indexOf('headless(command)') < main.indexOf('fn run('), 'dispatch happens before the window');
   assert.ok(gui.some((e: PlanEntry) => e.dest === 'tests/cli.rs'), 'both paths are tested');
 

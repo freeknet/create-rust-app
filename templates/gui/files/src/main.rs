@@ -20,7 +20,11 @@
 //! ## A release build borrows the terminal it was run from
 //!
 //! A release build has no console of its own. When it has something to
+// @if subcommands
 //! print (`--help`, `--version`, a usage error, a headless job) it attaches
+// @else
+//! print (`--help`, `--version`, a usage error) it attaches
+// @end
 //! to the console of the terminal it was run from, so the output lands
 //! there; launched from Explorer there is nothing to attach to. It never
 //! attaches just to open the window, which would tie the window's life to
