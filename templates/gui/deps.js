@@ -20,12 +20,13 @@ export default (ctx) => {
       features: ['wgpu', 'default_fonts', 'x11', 'wayland'],
     });
   }
-  // src/win/: MessageBoxW for startup failures (dialog.rs) and the wide-string helpers.
+  // src/win/: MessageBoxW for startup failures (dialog.rs), the wide-string helpers, and
+  // AttachConsole so a release build run from a terminal can print (console.rs).
   deps.push({
     name: 'windows-sys',
     version: '0.61',
     target: 'cfg(windows)',
-    features: ['Win32_Foundation', 'Win32_UI_WindowsAndMessaging'],
+    features: ['Win32_Foundation', 'Win32_System_Console', 'Win32_UI_WindowsAndMessaging'],
   });
   // The theme catalog and the config file are TOML, the user theme directory and the config
   // path come from `dirs`. Declared here as well as by src/gen/deps.js so turning `serde` off in

@@ -17,15 +17,28 @@
 //! Deliberately thin: it parses the command line, loads the saved
 //! preferences and hands off. Everything else belongs to the library.
 //!
-//! ## Failures are reported in a dialog on Windows
+//! ## A release build borrows the terminal it was run from
 //!
-//! A release build has no console, so anything written to stderr goes
-//! nowhere and a startup failure would look like the program refusing to
-//! open. See [`report`].
+//! A release build has no console of its own. Run with arguments from a
+//! terminal, it attaches to that terminal's console before parsing, so
+//! `--help`, `--version` and usage errors print there; launched from
+//! Explorer there is nothing to attach to and nothing changes.
+//!
+//! ## Failures are also reported in a dialog on Windows
+//!
+//! Launched from Explorer, anything written to stderr goes nowhere and a
+//! startup failure would look like the program refusing to open. See
+//! [`report`].
 
 use @@appCrateSnake@@::cli::Cli;
 
 fn main() -> std::process::ExitCode {
+    // Arguments mean a terminal (Explorer passes none): attach to its
+    // console before anything is printed, or it would print to nowhere.
+    #[cfg(windows)]
+    if std::env::args_os().len() > 1 {
+        @@appCrateSnake@@::win::console::attach_parent();
+    }
     // @if clap
     let cli = {
         use clap::Parser as _;
@@ -93,7 +106,8 @@ fn run(cli: Cli) -> anyhow::Result<()> {
 /// Reports a startup failure somewhere the user will actually see it.
 ///
 /// Written to stderr for a terminal, and on Windows also shown in a
-/// message box, because a release build has no console at all.
+/// message box, because a release build launched from Explorer has no
+/// console at all.
 fn report(message: &str) {
     eprintln!("{message}");
     #[cfg(windows)]
