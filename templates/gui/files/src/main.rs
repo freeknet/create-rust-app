@@ -40,7 +40,11 @@ fn main() -> std::process::ExitCode {
         @@appCrateSnake@@::win::console::attach_parent();
     }
     // @if clap
+    // @if subcommands
+    let mut cli = {
+    // @else
     let cli = {
+    // @end
         use clap::Parser as _;
         Cli::parse()
     };
@@ -56,6 +60,15 @@ fn main() -> std::process::ExitCode {
             return std::process::ExitCode::from(2);
         }
     };
+    // @end
+    // @if subcommands
+
+    // A subcommand is a headless job: run it against the terminal and exit
+    // with no window, before the single-instance check so a job can run
+    // beside an open window.
+    if let Some(command) = cli.command.take() {
+        return headless(command);
+    }
     // @end
     // @if singleInstance
 
@@ -80,6 +93,20 @@ fn main() -> std::process::ExitCode {
     }
 }
 
+// @if subcommands
+/// Runs a headless job. A failure goes to stderr only: the caller is a
+/// terminal or a script, not someone looking for a dialog.
+fn headless(command: @@appCrateSnake@@::cli::Command) -> std::process::ExitCode {
+    match command.run(&mut std::io::stdout().lock()) {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("error: {error:#}");
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+
+// @end
 /// Applies the command line to the saved preferences and opens the window.
 fn run(cli: Cli) -> anyhow::Result<()> {
     // @if config
@@ -98,7 +125,12 @@ fn run(cli: Cli) -> anyhow::Result<()> {
     }
     @@appCrateSnake@@::gui::run::run(config)
     // @else
+    // @if subcommands
+    // main() has taken any subcommand; only the window is left to open.
+    let Cli { command: _ } = cli;
+    // @else
     let Cli {} = cli;
+    // @end
     @@appCrateSnake@@::gui::run::run()
     // @end
 }

@@ -21,7 +21,7 @@ export const FEATURES: Record<FeatureKey, Choice> = {
   winres: { label: 'Windows resources', hint: 'exe icon, manifest, version info', group: 'packaging' },
   screenshotExample: { label: 'Screenshot example', hint: 'renders the UI headlessly to PNG', group: 'packaging' },
   demo: { label: 'Demo pages', hint: 'overview cards, palette and about pages; off = one empty page', group: 'content' },
-  subcommands: { label: 'Subcommands', hint: 'clap subcommands instead of the greeting demo', group: 'cli' },
+  subcommands: { label: 'Subcommands', hint: 'tool <command> …: a CLI\'s commands, or a desktop app\'s headless jobs', group: 'cli' },
 };
 
 /** The desktop app features: every feature but the CLI's command-line shape. */

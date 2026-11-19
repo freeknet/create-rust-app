@@ -58,8 +58,9 @@ export function effectiveAnswers(a: Answers): Answers {
   // The GUI kinds always ship a config file; the CLI only when serde is on to read it. A library
   // leaves config to the app embedding it, and the TUI template has none.
   if (!hasGui && !(a.kind === 'cli' && a.crates.serde)) out.features.config = false;
-  // Subcommands shape a clap command line, so they need the cli kind with clap.
-  if (a.kind !== 'cli' || !a.crates.clap) out.features.subcommands = false;
+  // Subcommands shape a clap command line: the cli kind's commands, or a desktop app's headless
+  // jobs. A TUI or a library has no place for them, and without clap there is no parser.
+  if (!a.crates.clap || !(a.kind === 'cli' || hasGui)) out.features.subcommands = false;
   // A library has no binary, and a binary named like its crate needs no [[bin]] table.
   if (a.kind === 'lib' || a.bin === (a.kind === 'workspace' ? `${a.name}-app` : a.name)) out.bin = '';
   return out;

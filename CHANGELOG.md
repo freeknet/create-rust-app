@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--with subcommands` on desktop apps: `app <job>` runs a headless job (`themes`, `paths` to start
+  with) and exits, a bare run opens the window as before, and `tests/cli.rs` covers both paths.
 - `--base <theme>`: lay the signature theme's accent on any shipped theme's surfaces, e.g.
   `--base graphite` for neutral greys behind media. The default (`midnight`) is unchanged, and the
   readability tests check the result in the generated project.

@@ -172,7 +172,7 @@ async function choiceHelp(caps: unknown): Promise<string[]> {
   const tint = (c: string, t: string) => rainbow.hex?.(caps, c, t) ?? t;
   const sections: [string, string, Record<string, { label: string; hint: string }>][] = [
     ['crates', '#ff6ec7', { ...labels.CRATE_TOGGLES, tokio: { label: 'tokio', hint: labels.ASYNC.tokio.hint }, ureq: { label: 'ureq', hint: labels.HTTP.ureq.hint }, reqwest: { label: 'reqwest', hint: labels.HTTP.reqwest.hint }, tracing: { label: 'tracing', hint: labels.LOGGING.tracing.hint }, env_logger: { label: 'env_logger', hint: labels.LOGGING.env_logger.hint } }],
-    ['command line (cli kind, with clap)', '#b6ff6e', { subcommands: labels.FEATURES.subcommands }],
+    ['command line (cli and desktop kinds, with clap)', '#b6ff6e', { subcommands: labels.FEATURES.subcommands }],
     ['app features (desktop kinds)', '#ff9f6e', labels.DESKTOP],
     ['tooling', '#ffd36e', labels.TOOLING],
   ];

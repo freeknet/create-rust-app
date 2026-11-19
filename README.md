@@ -99,7 +99,7 @@ create-rust-app [dir] [options]
 | `--author <name>` | Author for Cargo.toml, LICENSE, headers |
 | `--github <user>` | GitHub handle for CODEOWNERS and repository links |
 | `--accent <#hex>` | Accent colour for GUI themes (default `#00e5ff`) |
-| `--with a,b` | Turn on features / tooling, e.g. `--with tray,commandPalette`, or `--with subcommands` for a CLI built on a clap `Subcommand` enum |
+| `--with a,b` | Turn on features / tooling, e.g. `--with tray,commandPalette`, or `--with subcommands` for a CLI built on a clap `Subcommand` enum (on a desktop app: headless jobs beside the window) |
 | `--without demo` | Start a desktop app from one empty page instead of the overview / palette / about showcase |
 | `--without a,b` | Turn them off, e.g. `--without release,dependabot` |
 | `--set <key.path=value>` | Set any answer directly (repeatable), e.g. `--set tagline="Fast grep"`, `--set crates.async=tokio`. The only way to set `tagline` / `displayName` without prompts. `true`/`false` become booleans |

@@ -59,7 +59,7 @@ export function reviewLines(caps: Caps, a: Answers): { title: string; body: stri
     (Object.keys(cat) as K[]).filter((k) => values[k] && (!group || cat[k].group === group)).map((k) => soft(cat[k].label));
 
   const crates = ['anyhow'];
-  if (a.crates.clap && a.kind !== 'lib') crates.push(a.kind === 'cli' && a.features.subcommands ? 'clap subcommands' : 'clap');
+  if (a.crates.clap && a.kind !== 'lib') crates.push(effectiveAnswers(a).features.subcommands ? 'clap subcommands' : 'clap');
   crates.push(LOGGING[a.crates.logging].label);
   if (a.crates.serde) crates.push('serde + toml');
   if (a.crates.thiserror) crates.push('thiserror');
@@ -185,12 +185,17 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
       initialValues: toggles.filter((k) => out.crates[k]),
     }));
     for (const k of toggles) out.crates[k] = picked.includes(k);
-    if (a.kind === 'cli' && out.crates.clap) {
+    if ((a.kind === 'cli' || isGui(a)) && out.crates.clap) {
+      const gui = isGui(a);
       out.features.subcommands = got(await pick(caps, {
         message: 'Command line', initialValue: out.features.subcommands,
         options: ([
-          { value: false, label: 'One command', hint: 'flags only, with a greeting to replace' },
-          { value: true, label: FEATURES.subcommands.label, hint: 'tool <command> …, one enum variant per job' },
+          gui
+            ? { value: false, label: 'Window only', hint: 'a few flags, then the window' }
+            : { value: false, label: 'One command', hint: 'flags only, with a greeting to replace' },
+          gui
+            ? { value: true, label: FEATURES.subcommands.label, hint: 'app <job> runs headless; a bare run opens the window' }
+            : { value: true, label: FEATURES.subcommands.label, hint: 'tool <command> …, one enum variant per job' },
         ]),
       }));
     }

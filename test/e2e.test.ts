@@ -103,7 +103,7 @@ test('banners name the crates the project uses, not the options it could have (#
   }
 });
 
-test('--with subcommands swaps in the subcommand CLI, only for the cli kind with clap (#9)', async () => {
+test('--with subcommands swaps in the subcommand CLI for the cli kind with clap, and leaves a TUI alone (#9)', async () => {
   const plan = async (preset: string, extra: Record<string, unknown>) =>
     buildPlan(buildContext(resolveAnswers(preset, { name: 'sub-' + preset, ...extra })));
   const text = (entries: PlanEntry[], dest: string) => {
@@ -195,4 +195,24 @@ test('--base lays the signature theme on a shipped theme\'s surfaces (#19)', asy
   const midnight = await theme('midnight');
   assert.match(midnight, /app: "#0a0c11"\.to_string\(\)[\s\S]*rainbow_span: Some\(280\.0\)/);
   assert.match(midnight, /const FALLBACK_ACCENT: Rgb = Rgb::new\(0x4c, 0xc9, 0xf0\);/);
+});
+
+test('--with subcommands on a desktop app adds headless jobs beside the window (#17)', async () => {
+  const text = (entries: PlanEntry[], dest: string) => {
+    const e = entries.find((x: PlanEntry) => x.dest === dest);
+    return e && 'content' in e ? e.content : '';
+  };
+  const gui = await buildPlan(buildContext(resolveAnswers('rustaman', { name: 'g', features: { subcommands: true } })));
+  assert.match(text(gui, 'src/cli.rs'), /#\[command\(subcommand\)\]\n    pub command: Option<Command>,/, 'optional subcommand');
+  assert.match(text(gui, 'src/cli.rs'), /pub enum Command \{[\s\S]*Themes,[\s\S]*Paths,/, 'example jobs');
+  const main = text(gui, 'src/main.rs');
+  assert.match(main, /if let Some\(command\) = cli\.command\.take\(\) \{\n        return headless\(command\);/, 'headless dispatch');
+  assert.ok(main.indexOf('headless(command)') < main.indexOf('fn run('), 'dispatch happens before the window');
+  assert.ok(gui.some((e: PlanEntry) => e.dest === 'tests/cli.rs'), 'both paths are tested');
+
+  const plain = await buildPlan(buildContext(resolveAnswers('rustaman', { name: 'g' })));
+  assert.ok(!plain.some((e: PlanEntry) => e.dest === 'tests/cli.rs'), 'off by default');
+  assert.doesNotMatch(text(plain, 'src/main.rs'), /headless/, 'no headless path by default');
+  const noClap = buildContext(resolveAnswers('rustaman', { name: 'g', crates: { clap: false }, features: { subcommands: true } }));
+  assert.ok(!noClap.flags.has('subcommands'), 'needs clap');
 });

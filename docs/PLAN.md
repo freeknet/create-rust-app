@@ -171,7 +171,7 @@ debug = "line-tables-only"
 | theme base | any shipped theme id: `midnight` ★ / `graphite` / … (the surfaces the signature theme lays the accent on) |
 | crates | errors: anyhow ★ (+ thiserror ★ for lib/workspace); logging: `log` ★gui / `env_logger` ★cli / `tracing`; serde+toml ★; async: none ★ / tokio; http: none ★ / ureq / reqwest; sqlite: off ★ / rusqlite bundled; clap ★ (everything but lib) |
 | features (gui) | themes ★, brand ★, motion ★, icons ★, config ★, winres ★ (icon+manifest+version), tray, singleInstance, commandPalette, screenshotExample, demo ★ (off: one empty page instead of the overview / palette / about showcase) |
-| features (cli) | subcommands (clap `Subcommand` enum, `tool <command> …`, replaces the greeting demo; needs clap) |
+| features (cli, gui) | subcommands (needs clap). cli: a clap `Subcommand` enum replaces the greeting demo. gui: optional headless jobs (`app themes`, `app paths`); a bare run opens the window |
 | tooling | ci ★, release ★, cargoDeny ★, dependabot ★, toolchainPin ★, agentDocs ★ (AGENTS.md + CLAUDE.md), headerCheck ★, unsafeCheck ★ (gui), changelogGen ★, issueTemplates ★, codeowners ★, securityMd ★ |
 | theme | accent ★`#00e5ff` |
 | post | git ★ (init + initial commit `feat: scaffold <name> with create-rust-app`), cargoCheck ★ if cargo is on PATH, open: none ★ / code / cursor |

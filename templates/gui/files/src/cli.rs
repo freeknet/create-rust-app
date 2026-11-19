@@ -16,6 +16,11 @@
 //! flag added here is a flag that has to keep working. The ones that exist
 //! are the ones that cannot be reached any other way: an override for
 //! testing, and an escape hatch for a config that made the window unusable.
+// @if subcommands
+//!
+//! A subcommand ([`Command`]) is a headless job instead: it runs, prints
+//! and exits without a window, so scripts and CI can drive the app.
+// @end
 
 /// The parsed command line.
 // @if clap
@@ -44,9 +49,77 @@ pub struct Cli {
     #[arg(long)]
     // @end
     pub reset: bool,
+    // @if subcommands
+    /// A headless job to run instead of opening the window.
+    #[command(subcommand)]
+    pub command: Option<Command>,
+    // @end
+}
+// @elif subcommands
+pub struct Cli {
+    /// A headless job to run instead of opening the window.
+    #[command(subcommand)]
+    pub command: Option<Command>,
 }
 // @else
 pub struct Cli {}
+// @end
+// @if subcommands
+
+/// The headless jobs. Each runs, writes to stdout and exits without opening
+/// a window, for scripts, CI and agents; a bare run opens the window.
+///
+/// Add a variant per job and a matching arm in [`Command::run`]. There is no
+/// wildcard arm, so a variant without one fails the build.
+#[derive(clap::Subcommand, Clone, Debug, PartialEq, Eq)]
+pub enum Command {
+    /// List the themes this build can draw in, one `id<TAB>name` per line.
+    Themes,
+    /// Print where the app keeps its files, one `what<TAB>path` per line.
+    Paths,
+}
+
+impl Command {
+    /// Runs the job, writing its output to `out`.
+    ///
+    /// # Errors
+    ///
+    /// When `out` cannot be written to, or the job itself fails.
+    pub fn run(self, out: &mut impl std::io::Write) -> anyhow::Result<()> {
+        match self {
+            Self::Themes => {
+                // @if themes
+                for theme in crate::theme::Catalog::load().themes() {
+                    writeln!(out, "{}\t{}", theme.id, theme.name)?;
+                }
+                // @else
+                let theme = crate::theme::signature();
+                writeln!(out, "{}\t{}", theme.id, theme.name)?;
+                // @end
+            }
+            Self::Paths => {
+                // @if config | themes
+                let mut paths: Vec<(&str, std::path::PathBuf)> = Vec::new();
+                // @else
+                let paths: Vec<(&str, std::path::PathBuf)> = Vec::new();
+                // @end
+                // @if config
+                paths.extend(crate::config::config_path().map(|path| ("config", path)));
+                // @end
+                // @if themes
+                paths.extend(crate::theme::user_theme_dir().map(|dir| ("themes", dir)));
+                // @end
+                if paths.is_empty() {
+                    writeln!(out, "(none: this build keeps no files)")?;
+                }
+                for (what, path) in paths {
+                    writeln!(out, "{what}\t{}", path.display())?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
 // @end
 // @if !clap
 
