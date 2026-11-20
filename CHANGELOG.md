@@ -53,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `scaffold-check` gains `--gate fmt` (rustfmt only, no build), `--gate doc` (`cargo doc --no-deps`
+  with `RUSTDOCFLAGS=-D warnings`, opt-in) and `--name <name>`; it splits `--set` on the first `=`
+  and keeps an existing `CARGO_TARGET_DIR`.
 - `--with subcommands` on desktop apps: `app <job>` runs a headless job (`themes`, `paths` to start
   with) and exits, a bare run opens the window as before, and `tests/cli.rs` covers both paths.
 - `--base <theme>`: lay the signature theme's accent on any shipped theme's surfaces, e.g.
