@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The generated release build no longer restores `Swatinem/rust-cache`: the Actions cache is
   writable from any branch's CI, so a tagged build could have shipped a poisoned entry (zizmor
   `cache-poisoning`, high).
+- This repo's CI pins `actions/setup-node` to a full commit SHA (v7.1.0) and checks out without
+  persisting the token.
 
 ### Changed
 
