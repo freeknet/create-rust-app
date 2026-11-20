@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   crates.io limit, which `--bin` now shares). A long name used to die mid-write.
 - A target folder whose name can't be a crate name (`create-rust-app MyDir -y`) still gets the
   default crate name, but a one-line note on stderr now says so and points at `--name`.
+- An MSRV newer than the pinned toolchain, or older than the edition allows (2024 needs 1.85),
+  is an argument error (exit 2), whether it came from `--msrv`, `--toolchain`, `--set` or a preset.
+  It used to scaffold a project cargo then refused to build.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing

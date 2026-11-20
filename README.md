@@ -93,7 +93,7 @@ create-rust-app [dir] [options]
 | `--gui <stack>` | `eframe` (wgpu) or `winit-glow` (winit + glutin + egui_glow) |
 | `--base <theme>` | Surfaces the signature theme lays your accent on: any shipped theme id, e.g. `graphite` for neutral greys (default `midnight`) |
 | `--edition <e>` | `2024` or `2021` |
-| `--msrv <v>` | `rust-version` in Cargo.toml (default `1.98`) |
+| `--msrv <v>` | `rust-version` in Cargo.toml (default `1.98`); no newer than `--toolchain`, and at least `1.85` for edition 2024 (`1.56` for 2021) |
 | `--toolchain <v>` | Exact channel pinned in `rust-toolchain.toml` and CI (default `1.99.1`) |
 | `--license <l>` | `MIT`, `MIT+CommonsClause`, `Apache-2.0`, `MIT OR Apache-2.0` |
 | `--author <name>` | Author for Cargo.toml, LICENSE, headers |

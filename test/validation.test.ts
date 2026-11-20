@@ -40,3 +40,37 @@ test('parseArgv: --name and --bin apply the shared rules', () => {
   assert.throws(() => parseArgv(['--bin', 'x'.repeat(65)]), /Invalid binary name: Use at most 64/);
   assert.throws(() => parseArgv(['--set', 'name=gen']), /keyword/);
 });
+
+test('validateRustVersions: msrv must not be newer than the toolchain, nor older than the edition (B10)', async () => {
+  const { validateRustVersions } = await import('../src/context.ts');
+  assert.equal(validateRustVersions('1.98', '1.99.1', '2024'), null, 'defaults pass');
+  assert.equal(validateRustVersions('1.99.1', '1.99.1', '2024'), null, 'equal is fine');
+  assert.equal(validateRustVersions('1.85', '1.85.0', '2024'), null, '2024 from 1.85');
+  assert.equal(validateRustVersions('1.56', '1.99.1', '2021'), null, '2021 from 1.56');
+  assert.match(validateRustVersions('1.100', '1.99.1', '2024') ?? '', /msrv 1\.100 is newer than toolchain 1\.99\.1/, 'numeric, not string, compare');
+  assert.match(validateRustVersions('9.0', '1.0.0', '2021') ?? '', /newer than toolchain/);
+  assert.match(validateRustVersions('1.99.2', '1.99.1', '2024') ?? '', /newer than toolchain/, 'patch level counts');
+  assert.match(validateRustVersions('1.84', '1.99.1', '2024') ?? '', /edition 2024 needs Rust 1\.85/);
+  assert.match(validateRustVersions('1.55', '1.99.1', '2021') ?? '', /edition 2021 needs Rust 1\.56/);
+  assert.match(validateRustVersions('x', '1.99.1', '2024') ?? '', /not a Rust version/);
+});
+
+test('CLI: contradictory Rust versions exit 2 from flags, --set and preset defaults (B10)', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const bin = fileURLToPath(new URL('../bin/create-rust-app.ts', import.meta.url));
+  const run = (args: string[]) => spawnSync(process.execPath, [bin, ...args], { encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  for (const args of [
+    ['--msrv', '1.100', '--toolchain', '1.99.1'],
+    ['--set', 'msrv=1.100'],
+    ['--toolchain', '1.97.0'],
+    ['--msrv', '1.80'],
+    ['--preset', 'lib', '--msrv', '1.84'],
+  ]) {
+    const r = run([...args, '--dry-run', '-y']);
+    assert.equal(r.status, 2, `${args.join(' ')} exits 2; stderr ${r.stderr}`);
+    assert.match(r.stderr, /newer than toolchain|needs Rust 1\.85/);
+  }
+  const ok = run(['--msrv', '1.80', '--edition', '2021', '--dry-run', '-y', '--quiet']);
+  assert.equal(ok.status, 0, ok.stderr);
+});

@@ -62,6 +62,37 @@ export function validateBin(bin: string) {
   return reservedProblem(bin);
 }
 
+/** The first Rust release that accepts each edition (2021: 1.56.0, 2024: 1.85.0). */
+export const EDITION_MIN_RUST: Record<Answers['edition'], string> = { 2021: '1.56', 2024: '1.85' };
+
+/** `1.98` / `1.99.1` → [1, 98, 0] / [1, 99, 1]; null when it isn't a Rust version number. */
+function versionParts(v: string): number[] | null {
+  if (!/^\d+\.\d+(?:\.\d+)?$/.test(v)) return null;
+  const parts = v.split('.').map(Number);
+  return parts.length === 2 ? [...parts, 0] : parts;
+}
+
+function compareVersions(a: number[], b: number[]): number {
+  for (let i = 0; i < 3; i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) - (b[i] ?? 0);
+  return 0;
+}
+
+/**
+ * Cross-field check of the Rust versions: the pinned toolchain must be able to build the crate
+ * (`msrv` ≤ `toolchain`) and the MSRV must know the edition. Returns the problem, or null.
+ */
+export function validateRustVersions(msrv: string, toolchain: string, edition: Answers['edition']): string | null {
+  const m = versionParts(msrv);
+  const t = versionParts(toolchain);
+  if (!m) return `msrv "${msrv}" is not a Rust version number, such as 1.98.`;
+  if (!t) return `toolchain "${toolchain}" is not a Rust version number, such as 1.99.1.`;
+  const needed = EDITION_MIN_RUST[edition];
+  const n = versionParts(needed);
+  if (n && compareVersions(m, n) < 0) return `edition ${edition} needs Rust ${needed} or newer, but msrv is ${msrv}. Raise --msrv or pick another --edition.`;
+  if (compareVersions(m, t) > 0) return `msrv ${msrv} is newer than toolchain ${toolchain}, so the pinned toolchain can't build the crate. Lower --msrv or raise --toolchain.`;
+  return null;
+}
+
 /** @param {string} s */
 export const toSnake = (s: string) => s.replace(/-/g, '_');
 /** @param {string} s */

@@ -58,6 +58,9 @@ test/*.test.ts             node --test
   keyword (`RUST_KEYWORDS`: strict and reserved, editions 2015–2024), not Cargo-reserved
   (`CARGO_RESERVED`: `deps examples build incremental`), not a Windows device name (`WINDOWS_DEVICE_RE`).
 - `validateBin(bin) → string | null`: `^[a-z][a-z0-9_-]*$`, at most 64, the same Cargo and Windows rules.
+- `validateRustVersions(msrv, toolchain, edition) → string | null`: cross-field, run by `src/cli.ts`
+  after flags, `--set` and preset defaults resolve (and again after the prompts); exit 2. `msrv` ≤
+  `toolchain` (numeric compare) and `msrv` ≥ `EDITION_MIN_RUST[edition]` (2021: 1.56, 2024: 1.85).
 
 ## Ctx = Answers + derived
 

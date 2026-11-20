@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, resolve, relative } from 'node:path';
 import { parseArgv, optionalUi, renderHelp } from './args.ts';
 import { DEFAULTS, resolveAnswers } from './presets.ts';
-import { buildContext, effectiveAnswers, validateName } from './context.ts';
+import { buildContext, effectiveAnswers, validateName, validateRustVersions } from './context.ts';
 import { buildPlan } from './engine/plan.ts';
 import { targetProblem, writePlan } from './engine/write.ts';
 import { initRepo } from './post/git.ts';
@@ -196,6 +196,11 @@ export async function main(argv: string[]) {
       else if (!interactive) notice(`the folder name "${base}" can't be a crate name, so the crate is named "${DEFAULTS.name}" (set it with --name).`);
     }
 
+    // Fail before asking anything on Rust versions the flags already contradict (exit 2).
+    const early = resolveAnswers(overrides.preset, overrides);
+    const earlyVersions = validateRustVersions(early.msrv, early.toolchain, early.edition);
+    if (earlyVersions) throw new Exit(2, earlyVersions);
+
     // Fail before asking anything: a folder we can't write into shouldn't cost the user a walkthrough.
     const writes = !flags['dry-run'] && !flags.force;
     const knownTarget = dir ?? overrides.name;
@@ -219,6 +224,9 @@ export async function main(argv: string[]) {
     } else {
       answers = resolveAnswers(overrides.preset, overrides);
     }
+    // Cross-field checks, after flags, --set and preset defaults have all applied.
+    const versionProblem = validateRustVersions(answers.msrv, answers.toolchain, answers.edition);
+    if (versionProblem) throw new Exit(2, versionProblem);
 
     const ctx = buildContext(answers);
     const plan = await buildPlan(ctx);
