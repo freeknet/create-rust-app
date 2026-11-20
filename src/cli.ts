@@ -4,7 +4,7 @@ type Node = Map<string, Node>;
 import { readFile } from 'node:fs/promises';
 import { basename, resolve, relative } from 'node:path';
 import { parseArgv, optionalUi, renderHelp } from './args.ts';
-import { resolveAnswers } from './presets.ts';
+import { DEFAULTS, resolveAnswers } from './presets.ts';
 import { buildContext, effectiveAnswers, validateName } from './context.ts';
 import { buildPlan } from './engine/plan.ts';
 import { targetProblem, writePlan } from './engine/write.ts';
@@ -185,11 +185,15 @@ export async function main(argv: string[]) {
     const interactive = !flags.yes && !json && Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY);
     /** @param {string} s */
     const log = (s: string) => { if (!quiet) console.log(s); };
+    // One-line notices go to stderr so --json stays pure; only --quiet silences them.
+    const notice = (s: string) => { if (!flags.quiet) console.error(`note: ${s}`); };
 
     // A positional dir with no --name supplies the name when it is a valid crate name.
     if (dir && overrides.name === undefined) {
       const base = basename(resolve(dir));
       if (!validateName(base)) overrides.name = base;
+      // Otherwise the default name applies; the prompt asks for one, a scripted run says so.
+      else if (!interactive) notice(`the folder name "${base}" can't be a crate name, so the crate is named "${DEFAULTS.name}" (set it with --name).`);
     }
 
     // Fail before asking anything: a folder we can't write into shouldn't cost the user a walkthrough.

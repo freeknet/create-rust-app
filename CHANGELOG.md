@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prompt: Rust keywords from every edition (`fn`, `type`, `gen`, `try` …), Cargo-reserved names
   (`build`, `deps` …), Windows device names (`con`, `nul` …), and names over 64 characters (the
   crates.io limit, which `--bin` now shares). A long name used to die mid-write.
+- A target folder whose name can't be a crate name (`create-rust-app MyDir -y`) still gets the
+  default crate name, but a one-line note on stderr now says so and points at `--name`.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing
