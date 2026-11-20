@@ -28,6 +28,15 @@ function stepAt(lines: string[], start: number): string[] {
   return step;
 }
 
+/** The lines of one job (`  <id>:` at two spaces) in a workflow. */
+function job(content: string, id: string): string[] {
+  const lines = content.split('\n');
+  const start = lines.indexOf('  ' + id + ':');
+  assert.ok(start >= 0, 'no job ' + id);
+  const end = lines.findIndex((line: string, i: number) => i > start && /^ {2}[a-z][\w-]*:$/.test(line));
+  return lines.slice(start, end < 0 ? undefined : end);
+}
+
 for (const preset of Object.keys(PRESETS)) {
   test('workflows: every checkout in ' + preset + ' drops its credential (zizmor artipacked)', async () => {
     for (const [dest, content] of await workflows(preset)) {
@@ -37,6 +46,15 @@ for (const preset of Object.keys(PRESETS)) {
         const step = stepAt(lines, i).join('\n');
         assert.match(step, /^\s+persist-credentials: false$/m, preset + ': ' + dest + ':' + (i + 1));
       });
+    }
+  });
+
+  test('workflows: the tag-triggered release build in ' + preset + ' reads no cache (zizmor cache-poisoning)', async () => {
+    const release = (await workflows(preset)).get('.github/workflows/release.yml');
+    if (release === undefined) return;
+    for (const id of ['draft', 'build', 'publish']) {
+      const body = job(release, id).join('\n');
+      assert.doesNotMatch(body, /rust-cache|actions\/cache|cache: /, preset + ': release.yml job ' + id);
     }
   });
 }

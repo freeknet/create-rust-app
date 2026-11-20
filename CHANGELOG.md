@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generated workflows check out with `persist-credentials: false`, so the job token is not left
   in `.git/config` for build scripts to read (zizmor `artipacked`). No step needed it: `gh`
   authenticates with `GH_TOKEN`.
+- The generated release build no longer restores `Swatinem/rust-cache`: the Actions cache is
+  writable from any branch's CI, so a tagged build could have shipped a poisoned entry (zizmor
+  `cache-poisoning`, high).
 
 ### Changed
 
