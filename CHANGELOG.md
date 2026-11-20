@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   committed what was there, printed success and exited 0. Occupied folders are now refused before
   any question (unless `--force`), and a failed write stops the run with exit code 1.
 - Animated prompts no longer flicker.
+- Generated workflows check out with `persist-credentials: false`, so the job token is not left
+  in `.git/config` for build scripts to read (zizmor `artipacked`). No step needed it: `gh`
+  authenticates with `GH_TOKEN`.
 
 ### Changed
 

@@ -36,7 +36,13 @@ jobs:
       # risk the moment the workflow holds a write-capable token. Update
       # deliberately, with a diff of the new SHA, not silently on the next
       # run. The versions are in the trailing comments.
+      #
+      # `persist-credentials: false` everywhere: no step pushes or tags, so
+      # the token checkout would otherwise leave in .git/config is only
+      # something a build script could read.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # The version matches rust-toolchain.toml, so CI and a local checkout
       # run the same rustfmt and the same clippy. `@stable` would mean CI
       # silently moving to each new release on its own.
@@ -56,6 +62,8 @@ jobs:
     # downloads the advisory database and scans the lockfile.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           command: check
@@ -72,6 +80,8 @@ jobs:
 # @end
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10
         with:
@@ -123,6 +133,8 @@ jobs:
 # @end
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10
         with:
