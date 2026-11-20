@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Project names that cannot build are refused up front, on the command line and in the name
+  prompt: Rust keywords from every edition (`fn`, `type`, `gen`, `try` …), Cargo-reserved names
+  (`build`, `deps` …), Windows device names (`con`, `nul` …), and names over 64 characters (the
+  crates.io limit, which `--bin` now shares). A long name used to die mid-write.
+
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing
   (`src/win/console.rs`). Opening the window never attaches, so closing the terminal doesn't close

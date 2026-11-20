@@ -86,8 +86,8 @@ create-rust-app [dir] [options]
 | Flag | Meaning |
 |---|---|
 | `[dir]` | Target directory (defaults to the project name) |
-| `--name <kebab>` | Crate / project name, `^[a-z][a-z0-9-]*$` |
-| `--bin <name>` | Executable name when it differs from the crate (writes `[[bin]]`; clap, README and release follow it) |
+| `--name <kebab>` | Crate / project name, `^[a-z][a-z0-9-]*$`, at most 64 characters; not a Rust keyword (`fn`, `type`, `gen` …), `test`/`std`/`core`/`alloc`/`proc-macro`, a Cargo-reserved name (`build`, `deps`, `examples`, `incremental`) or a Windows device name (`con`, `nul` …) |
+| `--bin <name>` | Executable name when it differs from the crate (writes `[[bin]]`; clap, README and release follow it). Lowercase letters, digits, `-` and `_`, at most 64 characters, same Cargo and Windows reserved names |
 | `--preset <p>` | `rustaman` `strobe` `cli` `tui` `lib` `minimal`, or `custom` for no preset (the defaults) |
 | `--kind <k>` | `cli` `gui` `tui` `lib` `workspace` |
 | `--gui <stack>` | `eframe` (wgpu) or `winit-glow` (winit + glutin + egui_glow) |

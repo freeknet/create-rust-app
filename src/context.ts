@@ -4,23 +4,62 @@ import { DEFAULT_BASE, shippedTheme } from './gen/themes.ts';
 
 export const NAME_RE = /^[a-z][a-z0-9-]*$/;
 
+/** crates.io refuses longer package names; the binary name gets the same cap. */
+export const MAX_NAME_LENGTH = 64;
+
+/**
+ * Rust keywords from the Reference (strict and reserved, every edition through 2024). A crate
+ * name is a Rust identifier once dashes become underscores, so none of these can be one; Cargo
+ * refuses them too. Weak keywords (`union`, `macro_rules`, `raw`, `safe`) are ordinary identifiers.
+ */
+export const RUST_KEYWORDS: readonly string[] = [
+  // strict, 2015
+  'as', 'break', 'const', 'continue', 'crate', 'else', 'enum', 'extern', 'false', 'fn', 'for', 'if',
+  'impl', 'in', 'let', 'loop', 'match', 'mod', 'move', 'mut', 'pub', 'ref', 'return', 'self',
+  'static', 'struct', 'super', 'trait', 'true', 'type', 'unsafe', 'use', 'where', 'while',
+  // strict, 2018+
+  'async', 'await', 'dyn',
+  // reserved, 2015
+  'abstract', 'become', 'box', 'do', 'final', 'macro', 'override', 'priv', 'typeof', 'unsized',
+  'virtual', 'yield',
+  // reserved, 2018+ and 2024+
+  'try', 'gen',
+];
+
+/** Crates every program already has in scope: a crate of the same name shadows them. */
+const BUILTIN_CRATES: readonly string[] = ['test', 'core', 'std', 'alloc', 'proc-macro'];
+
+/** Cargo refuses these as package and target names: they collide with directories under target/. */
+export const CARGO_RESERVED: readonly string[] = ['deps', 'examples', 'build', 'incremental'];
+
+/** Every project builds a Windows .exe, and Windows treats these as devices, not files. */
+export const WINDOWS_DEVICE_RE = /^(con|prn|aux|nul|com\d|lpt\d)$/;
+
+const tooLong = (name: string) =>
+  `Use at most ${MAX_NAME_LENGTH} characters (the crates.io limit); this one has ${name.length}.`;
+
+/** Rules a crate name and a binary name share: Cargo's reserved names and Windows device names. */
+function reservedProblem(name: string): string | null {
+  if (CARGO_RESERVED.includes(name)) return `"${name}" is reserved by Cargo.`;
+  if (WINDOWS_DEVICE_RE.test(name)) return `"${name}" is a reserved device name on Windows.`;
+  return null;
+}
+
 /** @param {string} name */
 export function validateName(name: string) {
+  if (name.length > MAX_NAME_LENGTH) return tooLong(name);
   if (!NAME_RE.test(name)) return 'Use lowercase letters, digits, and dashes, starting with a letter.';
   if (name.endsWith('-') || name.includes('--')) return 'No trailing or doubled dashes.';
-  if (['test', 'core', 'std', 'alloc', 'proc-macro', 'self', 'crate', 'super'].includes(name))
-    return `"${name}" is reserved in Rust.`;
-  return null;
+  if (BUILTIN_CRATES.includes(name)) return `"${name}" is reserved in Rust.`;
+  if (RUST_KEYWORDS.includes(name)) return `"${name}" is a Rust keyword, so it can't name a crate.`;
+  return reservedProblem(name);
 }
 
 /** A binary name: what users type, so the same rules as a crate name plus underscores. */
 export function validateBin(bin: string) {
+  if (bin.length > MAX_NAME_LENGTH) return tooLong(bin);
   if (!/^[a-z][a-z0-9_-]*$/.test(bin)) return 'Use lowercase letters, digits, dashes and underscores, starting with a letter.';
-  // Cargo refuses these as target names: they collide with directories under target/.
-  if (['deps', 'examples', 'build', 'incremental'].includes(bin)) return `"${bin}" is reserved by Cargo.`;
-  // Every project builds a Windows .exe, and Windows treats these as devices, not files.
-  if (/^(con|prn|aux|nul|com\d|lpt\d)$/.test(bin)) return `"${bin}" is a reserved device name on Windows.`;
-  return null;
+  return reservedProblem(bin);
 }
 
 /** @param {string} s */
