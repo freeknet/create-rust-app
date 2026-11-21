@@ -7,7 +7,7 @@ import { parseArgv, optionalUi, renderHelp } from './args.ts';
 import { DEFAULTS, resolveAnswers } from './presets.ts';
 import { buildContext, effectiveAnswers, ignoredOptions, reportedAnswers, validateName, validateRustVersions } from './context.ts';
 import { buildPlan } from './engine/plan.ts';
-import { targetProblem, writePlan } from './engine/write.ts';
+import { existingFiles, targetProblem, writePlan } from './engine/write.ts';
 import { initRepo } from './post/git.ts';
 import { cargoCheck } from './post/cargo.ts';
 import { openEditor } from './post/open.ts';
@@ -78,9 +78,17 @@ export function nextCommands(a: Answers, shown: string): [string, string][] {
   return out;
 }
 
+/** The one-line `--force` report: how many existing files were overwritten, and which. */
+export function overwriteNotice(files: string[], max = 20): string {
+  const shown = files.slice(0, max).join(', ');
+  const more = files.length > max ? `, and ${files.length - max} more` : '';
+  return `--force overwrote ${files.length} existing file${files.length === 1 ? '' : 's'}: ${shown}${more}`;
+}
+
 /** Interactive run: ticked steps with timings, then the next-steps box and a sign-off. */
-async function runInteractive({ caps, answers, plan, target, shown, force }: {
+async function runInteractive({ caps, answers, plan, target, shown, force, overwrites, notice }: {
   caps: Caps; answers: Answers; plan: PlanEntry[]; target: string; shown: string; force: boolean;
+  overwrites: string[]; notice: (s: string) => void;
 }) {
   const { dim, paint } = await import('./ui/rainbow.ts');
   const { box, cancel, log, outro, tasks } = await import('./ui/rail.ts');
@@ -106,11 +114,13 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
       : { ok, message: ok ? `${label} done` : `${label} failed ${dim(caps, '(run it in the project for details)')}` };
   };
 
+  let wrote = false;
   const finished = await tasks(caps, [
     {
       title: `Writing ${plan.length} files`, required: true, run: async (update) => {
         await writePlan(plan, target, { force, onFile: (dest, i, n) => update(`${String(i).padStart(String(n).length)}/${n}  ${dest}`) });
-        return { ok: true, message: `Wrote ${plan.length} files to ${shown}` };
+        wrote = true;
+        return { ok: true, message: `Wrote ${plan.length} files to ${shown}${overwrites.length ? `${g.sep}overwrote ${overwrites.length}` : ''}` };
       },
     },
     // Fetch first: it writes Cargo.lock, which belongs in the first commit (#11).
@@ -125,6 +135,8 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
     },
     { title: 'cargo check', enabled: answers.post.cargoCheck, run: cargoTask('cargo check', cargoCheck) },
   ]);
+  // After the task rail, so the list doesn't tear through its live lines.
+  if (wrote && overwrites.length) notice(overwriteNotice(overwrites));
   if (!finished) {
     cancel(caps, 'Stopped: nothing after the failed step ran.');
     return false;
@@ -236,9 +248,15 @@ export async function main(argv: string[]) {
     const target = resolve(dir ?? answers.name);
     const rel = relative(process.cwd(), target);
     const shown = rel.startsWith('..') ? target : rel || '.';
+    // Files --force is about to replace, reported once the write succeeds.
+    const overwrites = flags.force && !flags['dry-run'] ? existingFiles(plan, target) : [];
+    const reportOverwrites = () => { if (overwrites.length) notice(overwriteNotice(overwrites)); };
 
     if (json) {
-      if (!flags['dry-run']) await writePlan(plan, target, { force: Boolean(flags.force) });
+      if (!flags['dry-run']) {
+        await writePlan(plan, target, { force: Boolean(flags.force) });
+        reportOverwrites();
+      }
       // Report what was generated: options this kind never uses read false (#6), and no GUI stack.
       console.log(JSON.stringify({ answers: reportedAnswers(answers), files: dests }, null, 2));
       return 0;
@@ -251,10 +269,11 @@ export async function main(argv: string[]) {
 
     if (interactive) {
       // The review screen already confirmed; this is the run + finish.
-      return (await runInteractive({ caps, answers, plan, target, shown, force: Boolean(flags.force) })) ? 0 : 1;
+      return (await runInteractive({ caps, answers, plan, target, shown, force: Boolean(flags.force), overwrites, notice })) ? 0 : 1;
     }
 
     await writePlan(plan, target, { force: Boolean(flags.force) });
+    reportOverwrites();
 
     // Post-steps.
     const spinMod = await optionalUi('spinner');

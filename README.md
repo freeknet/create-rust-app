@@ -113,7 +113,7 @@ create-rust-app [dir] [options]
 | `--json` | Machine-readable output |
 | `--no-color` | Plain output (also honoured: `NO_COLOR`, non-TTY, `CI`) |
 | `--quiet` | Only errors |
-| `--force` | Write into a non-empty directory |
+| `--force` | Write into a non-empty directory; lists the existing files it overwrote on stderr |
 | `--help`, `--version` | The usual |
 
 A non-TTY stdin implies `--yes`. Answer flags apply left to right, so a later `--set` or

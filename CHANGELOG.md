@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scaffolding into a folder that holds only a fresh `git init` makes the first commit there,
   staging the generated files by path (anything else in the folder stays untracked). Inside some
   other repository git is still skipped, and the finished summary no longer promises a commit.
+- A write that fails midway no longer leaves a partial project: a folder the run created is
+  removed, and in an existing folder only the files the run added are, with the error saying
+  which. `--force` lists the existing files it overwrote on stderr.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing

@@ -18,7 +18,8 @@ src/engine/directives.ts   applyDirectives(text, flags) → text         (CORE, 
 src/engine/render.ts       renderText(text, ctx, dest) → text          (CORE, exists)
 src/engine/groups.ts       GROUPS: [{ id, when(ctx) }]                 (CORE, exists)
 src/engine/plan.ts         buildPlan(ctx) → Promise<PlanEntry[]>       (CORE, exists)
-src/engine/write.ts        writePlan(plan, targetDir, {force, dryRun, onFile}); targetProblem(dir)
+src/engine/write.ts        writePlan(plan, targetDir, {force, dryRun, onFile}); targetProblem(dir); existingFiles(plan, dir)
+                           (on a failed write, writePlan removes the target if it created it, else only what it added)
 src/gen/header.ts          moduleFor(dest, ctx) → string               (CORE, exists)
 src/gen/index.ts           generate(ctx) → PlanEntry[]                 (Cargo.toml, deny.toml …)
 src/gen/cargo.ts, deps.ts, deny.ts
