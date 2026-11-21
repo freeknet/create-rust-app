@@ -18,10 +18,6 @@ const SHORT = 'a';
 const LONG = 'abcdefghij'.repeat(6) + 'abcd'; // 64 characters, the crates.io limit
 const LONG_DASHED = 'ab-cd-ef-gh-'.repeat(5) + 'ij-k'; // 64, with dashes (Pascal/snake forms differ)
 
-// The changelog generators are owned by the changelog work (fix-plan row 4): `REPO` and the
-// header string grow with the name. Remove these once that lands.
-const KNOWN = new Set(['examples/changelog.rs', 'crates/xtask/src/changelog.rs']);
-
 const COMBOS: [string, PartialAnswers][] = [
   ['rustaman', {}],
   ['rustaman', { features: { tray: true, singleInstance: true, commandPalette: true, subcommands: true } }],
@@ -59,7 +55,6 @@ for (const [preset, over] of COMBOS) {
       assert.deepEqual([...wide.keys()].sort(), [...short.keys()].sort(), 'same files for both names');
       const problems: string[] = [];
       for (const [dest, text] of wide) {
-        if ([...KNOWN].some((k) => dest.endsWith(k))) continue;
         const a = (short.get(dest) ?? '').split('\n');
         const b = text.split('\n');
         assert.equal(b.length, a.length, `${dest}: line count must not depend on the name`);
@@ -70,6 +65,8 @@ for (const [preset, over] of COMBOS) {
           const t = line.trimStart();
           if (line === a[i] || t.startsWith('#[') || t.startsWith('///') || t.startsWith('//!')) return;
           if (t.startsWith('// Module:')) return;
+          // A line ending in `\` continues a multi-line string literal, which rustfmt never touches.
+          if (line.endsWith('\\')) return;
           if (line.length > 100) problems.push(`${dest}:${i + 1} (${line.length} cols): ${line.trim()}`);
         });
       }
@@ -80,7 +77,7 @@ for (const [preset, over] of COMBOS) {
 
 const hasRustfmt = spawnSync('rustfmt', ['--version'], { stdio: 'ignore' }).status === 0;
 
-for (const preset of ['rustaman', 'strobe', 'cli', 'tui']) {
+for (const preset of ['rustaman', 'strobe', 'cli', 'tui', 'lib', 'minimal']) {
   test(`name length: ${preset} is rustfmt-clean with 1- and 64-character names`, async (t: TestContext) => {
     if (!hasRustfmt) {
       t.skip('rustfmt is not installed');
@@ -93,7 +90,7 @@ for (const preset of ['rustaman', 'strobe', 'cli', 'tui']) {
       try {
         await writePlan(plan, dir, { force: true });
         const files = plan
-          .filter((e: PlanEntry) => e.dest.endsWith('.rs') && ![...KNOWN].some((k) => e.dest.endsWith(k)))
+          .filter((e: PlanEntry) => e.dest.endsWith('.rs'))
           .map((e: PlanEntry) => join(dir, e.dest));
         const r = spawnSync('rustfmt', ['--check', '--edition', ctx.edition, ...files], { encoding: 'utf8' });
         assert.equal(r.status, 0, `${preset} named ${name}:\n${r.stdout}${r.stderr}`);
