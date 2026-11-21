@@ -74,6 +74,9 @@ cargo run --example screenshot                  # see the UI, without a window
 cargo run                                       # the app, debug
 cargo run --release                             # the app, as shipped
 <!-- @end -->
+<!-- @if changelogGen -->
+cargo run --example changelog                   # regenerate CHANGELOG.md
+<!-- @end -->
 <!-- @if cargoDeny -->
 cargo deny check                                # licences, advisories, sources
 <!-- @end -->
@@ -142,8 +145,11 @@ unlinted. A violation is a build failure.
 Denied in `[lints]` in `Cargo.toml`, so a violation is a build failure.
 <!-- @end -->
 Use `?`, `let ... else`, or an explicit fallback. Tests return
-`anyhow::Result<()>`, and every `assert!` carries a message. Release builds
-use `panic = "abort"`, so a panic is a crash, not an unwound error.
+`anyhow::Result<()>`. Release builds use `panic = "abort"`, so a panic is a
+crash, not an unwound error.
+
+By convention, not by any check, every `assert!` carries a message saying
+what failed: a bare `assertion failed` in CI tells nobody anything.
 
 The same block denies `wildcard_enum_match_arm` (name every variant: that
 is what catches a new variant silently doing nothing), `missing_docs`,
@@ -169,16 +175,21 @@ blank line, then the module's `//!` docs:
 //! The config file: every field optional, parsed independently.
 ```
 
-`src/header_check.rs` walks `src/`, `tests/` and `examples/` and fails the
-build for a file missing one, so a new file needs its header in the same
-commit that adds it. `Module:` is checked against the path the file sits at:
+`src/header_check.rs` walks `src/`, `tests/`, `examples/`, `benches/` and
+`build.rs` and fails the test run for a file missing one, so a new file
+needs its header in the same commit that adds it. `Module:` is checked
+against the path the file sits at:
 <!-- @if workspace -->
 `src/foo/mod.rs` is `@@appCrateSnake@@::foo`, `src/lib.rs` is
-`@@appCrate@@ (library crate root)`, and `tests/x.rs` is
-`x (integration test)`.
+`@@appCrate@@ (library crate root)`, `src/main.rs` is
+`@@appCrate@@ (binary crate root)`, `tests/x.rs` is `x (integration test)`,
+`examples/x.rs` is `x (example)`, `benches/x.rs` is `x (benchmark)`, and
+`build.rs` is `build (build script)`.
 <!-- @else -->
 `src/foo/mod.rs` is `foo`, `src/lib.rs` is `@@name@@ (library crate root)`,
-and `tests/x.rs` is `x (integration test)`.
+`src/main.rs` is `@@name@@ (binary crate root)`, `tests/x.rs` is
+`x (integration test)`, `examples/x.rs` is `x (example)`, `benches/x.rs` is
+`x (benchmark)`, and `build.rs` is `build (build script)`.
 <!-- @end -->
 Copy an existing header and fix all three fields. The banner is plain `//`,
 not `//!`; the reasoning belongs in the `//!` block below it.
@@ -223,10 +234,24 @@ note saying what would clear it.
 
 `cargo xtask changelog` rebuilds it from `git tag` plus conventional-commit
 subjects, so an edit to a released section does not survive. Prose for a
-release belongs in the GitHub release body. **Never amend or rebase a
-commit after tagging it**: the tag keeps pointing at the discarded copy,
-and every release range computed from it is then wrong.
+release belongs in the GitHub release body. `cargo xtask changelog --check`
+compares the released sections with the history; CI does not run it, so
+run it before a release. **Never amend or rebase a commit after tagging
+it**: the tag keeps pointing at the discarded copy, and every release range
+computed from it is then wrong.
 <!-- @elif changelogGen -->
+
+### `CHANGELOG.md` is generated: never hand-edit it
+
+`cargo run --example changelog` rebuilds it from `git tag` plus
+conventional-commit subjects, so an edit to a released section does not
+survive. Prose for a release belongs in the GitHub release body.
+`cargo run --example changelog -- --check` compares the released sections
+with the history; CI does not run it, so run it before a release.
+**Never amend or rebase a commit after tagging it**: the tag keeps pointing
+at the discarded copy, and every release range computed from it is then
+wrong.
+<!-- @else -->
 
 ### `CHANGELOG.md` moves with the code
 
