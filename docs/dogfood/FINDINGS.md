@@ -136,10 +136,13 @@ Ranked by value ÷ effort. "Changes defaults" items are proposals only.
 | P16 | **TUI log file location** | B22. | `dirs::state_dir()`/cache dir, or `create_new` with a per-process name. | `templates/tui/files/src/logging.rs` | Yes (file location) |
 | P17 | **`.gitignore` `*.log`** | F14. | Anchor it (`/*.log`) so fixtures under `tests/` are tracked. | `templates/base/files/_gitignore:4` | Yes |
 | P18 | **New presets: axum service, wasm, `no_std`; macOS GUI** | No dogfood evidence either way; each is a new template group with its own lint and CI story. macOS CI targets depend on P4. | One preset at a time, axum first (largest audience, reuses the cli group). | `templates/`, `src/presets.ts` | No |
-| P19 | **npm name** | `src/reproduce.ts:9-14`: the tool runs from GitHub because the `create-rust-app` name is not this project's. | See REPORT.md for the name research. | `package.json`, `src/reproduce.ts` | Owner decision |
+| P19 | **npm name** | `src/reproduce.ts:9-14`: the tool runs from GitHub because the `create-rust-app` name is not this project's. | `@freeknet/create-rust-app` (`npm create @freeknet/rust-app`), then `create-rust-app-kit`; research in REPORT.md. | `package.json`, `src/reproduce.ts` | Owner decision |
 | P20 | **Third-party template groups** | No evidence of demand. The group format (`manifest.js`, `deps.js`) executes code, so loading external groups is a trust decision. | Defer until P12 fixes the answers file and the group API is documented as stable. | `src/engine/groups.ts` | No |
 
 ## 5. Fix plan (Phase 3)
+
+All eight rows were implemented; commits, the after-matrix and what was deferred are in
+[REPORT.md](REPORT.md).
 
 In scope: bug fixes, missing validation, better errors, docs, tests. Nothing here changes a
 flag, a default answer, the lint table, the banner format, licence options or file layout.
