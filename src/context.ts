@@ -213,6 +213,8 @@ export function buildContext(raw: Answers): Ctx {
   }
 
   const appCrate = workspace ? `${a.name}-app` : a.name;
+  // Resolved once so Cargo.toml, README and doc comments agree: an empty tagline reads as the name.
+  const tagline = a.tagline.trim() ? a.tagline : a.name;
   const year = String(new Date().getFullYear());
   /** @type {Record<string,string>} */
   const tokens: Record<TokenKey,string> = {
@@ -226,7 +228,7 @@ export function buildContext(raw: Answers): Ctx {
     appCrate,
     appCrateSnake: toSnake(appCrate),
     displayName: a.displayName || toPascal(a.name),
-    tagline: a.tagline || '',
+    tagline,
     author: a.author || '',
     github: a.github || '',
     email: a.email || '',
@@ -255,6 +257,7 @@ export function buildContext(raw: Answers): Ctx {
 
   return {
     ...a,
+    tagline,
     crate: tokens.crate,
     Name: tokens.Name,
     NAME: tokens.NAME,

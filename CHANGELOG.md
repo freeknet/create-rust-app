@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--preset cli --gui winit-glow`, `subcommands` on a TUI or without clap) each print a one-line
   note on stderr instead of vanishing silently; `--quiet` hides them. `--json` reports `guiStack`
   as `""` for kinds without a GUI, as it already did `themeBase`.
+- An empty tagline reads as the project name everywhere: the README's bold line used to come out
+  as `****` while `Cargo.toml` already fell back to the name.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing
