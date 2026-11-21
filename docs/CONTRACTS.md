@@ -210,10 +210,11 @@ bannerFrame(caps, frame) → string[]; showBanner(caps) → Promise<void>
 // labels.ts: the words for every option; prompts, review and --help all read these
 FEATURES, TOOLING, CRATE_TOGGLES, LOGGING, ASYNC, HTTP, LICENSES, STACKS, KINDS, grouped(catalogue)
 // choose.ts
-pick(caps, { message, options: Item[], initialValue?, io? }) → value | cancel symbol
-pickMany(caps, { message, options: Item[], initialValues?, io? }) → values | cancel symbol
+pick(caps, { message, options: Item[], initialValue?, back?, io? }) → value | cancel symbol | BACK
+pickMany(caps, { message, options: Item[], initialValues?, back?, io? }) → values | cancel symbol | BACK
+// back: true → Esc resolves to BACK (footer `esc back`); Ctrl-C always resolves to the cancel symbol
 // rail.ts
-text(caps, { message, placeholder?, defaultValue?, initialValue?, validate?, io? }) → string | cancel symbol
+text(caps, { message, placeholder?, defaultValue?, initialValue?, validate?, back?, io? }) → string | cancel symbol | BACK
 note(caps, title, body); box(caps, title, lines); log(caps, lines); outro(caps, msg); cancel(caps, msg)
 tasks(caps, Task[]) → Promise<boolean>  // false as soon as a `required` task fails; later tasks don't run
 // motion.ts: one animated line per prompt

@@ -5,7 +5,7 @@
  * row, and echo the full label after submit. We want every description visible while choosing and a
  * short, clean echo afterwards, grouped headers without selectable group rows, and our palette.
  */
-import { MultiSelectPrompt, SelectPrompt } from '@clack/core';
+import { MultiSelectPrompt, SelectPrompt, isCancel } from '@clack/core';
 import type { Readable, Writable } from 'node:stream';
 import { glyphs } from './glyphs.ts';
 import { live, shimmer } from './motion.ts';
@@ -43,6 +43,34 @@ function layout<V>(caps: Caps, items: Item<V>[], indent: number) {
   });
 }
 
+/**
+ * What a prompt opened with `back: true` resolves to when Esc is pressed. Ctrl-C still resolves to
+ * clack's cancel symbol. @clack/core maps both keys to one cancel action, but it emits the `key`
+ * event before acting on it, so the prompt can tell them apart.
+ */
+export const BACK: unique symbol = Symbol('create-rust-app:back');
+
+/** Remember whether the key that ended a prompt was Esc. */
+export function escWatch(prompt: { on(event: 'key', cb: (key: string | undefined, info: { name?: string | undefined }) => void): void }) {
+  const seen = { esc: false };
+  prompt.on('key', (_key, info) => { seen.esc = info?.name === 'escape'; });
+  return seen;
+}
+
+/** Resolve Esc to BACK on a `back` prompt; everything else (Ctrl-C included) passes through. */
+export function settle<T>(result: Promise<T | symbol>, seen: { esc: boolean }, back: boolean | undefined): Promise<T | symbol> {
+  return back ? result.then((v) => (isCancel(v) && seen.esc ? BACK : v)) : result;
+}
+
+/** The frame a `back` prompt leaves behind on Esc: a dim, closed step rather than a red cancel. */
+export function backFrame(caps: Caps, message: string) {
+  const c = chrome(caps);
+  return `${c.bar()}\n${dim(caps, c.g.done)}  ${dim(caps, message)}\n${c.bar()}`;
+}
+
+/** The Esc part of a footer: Esc steps back inside Customize, and cancels the run elsewhere. */
+export const escHint = (back: boolean | undefined) => (back ? 'esc back' : 'esc cancel');
+
 const echo = (caps: Caps, lines: string[]) => {
   const c = chrome(caps);
   return lines.map((l) => `${c.bar()}  ${dim(caps, l)}`).join('\n');
@@ -52,7 +80,7 @@ const echo = (caps: Caps, lines: string[]) => {
 /** Optional streams (tests drive prompts in-process with these). */
 export type Io = { input?: Readable; output?: Writable };
 
-export function pick<V>(caps: Caps, o: { message: string; options: Item<V>[]; initialValue?: V; footer?: string; io?: Io }) {
+export function pick<V>(caps: Caps, o: { message: string; options: Item<V>[]; initialValue?: V; footer?: string; back?: boolean; io?: Io }) {
   const c = chrome(caps);
   const rows = layout(caps, o.options, 6);
   const anim = { t: 0 };
@@ -64,26 +92,27 @@ export function pick<V>(caps: Caps, o: { message: string; options: Item<V>[]; in
       const head = `${c.bar()}\n`;
       const chosen = this.options[this.cursor];
       if (this.state === 'submit') return `${head}${c.done()}  ${o.message}\n${echo(caps, [chosen?.label ?? ''])}`;
-      if (this.state === 'cancel') return `${head}${hex(caps, RED, c.g.cancel)}  ${o.message}\n${c.bar()}`;
+      if (this.state === 'cancel') return o.back && seen.esc ? backFrame(caps, o.message) : `${head}${hex(caps, RED, c.g.cancel)}  ${o.message}\n${c.bar()}`;
       const body = rows.map((r, i) => {
         const on = i === this.cursor;
         const dot = on ? hex(caps, GREEN, c.g.radioOn) : dim(caps, c.g.radioOff);
         const label = on ? shimmer(caps, r.label, anim.t) : r.label;
         return `${c.live()}  ${dot} ${label}${r.tag}${r.gap}${on ? r.hint : dim(caps, r.hint)}`;
       });
-      const footer = `${c.live(c.g.barEnd)}  ${dim(caps, o.footer ?? `${c.g.up}${c.g.down} move · enter select · esc cancel`)}`;
+      const footer = `${c.live(c.g.barEnd)}  ${dim(caps, o.footer ?? `${c.g.up}${c.g.down} move · enter select · ${escHint(o.back)}`)}`;
       return `${head}${c.live(c.g.step)}  ${o.message}\n${body.join('\n')}\n${footer}`;
     },
   });
+  const seen = escWatch(prompt);
   live(caps, prompt, anim);
-  return prompt.prompt() as Promise<V | symbol>;
+  return settle(prompt.prompt() as Promise<V | symbol>, seen, o.back);
 }
 
 /**
  * Multiple choice, optionally grouped (`item.group`). Group names render as coloured headers; only
  * items are selectable. Resolves to the selected values, or clack's cancel symbol.
  */
-export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]; initialValues?: V[]; io?: Io }) {
+export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]; initialValues?: V[]; back?: boolean; io?: Io }) {
   const c = chrome(caps);
   const grouped = o.options.some((i) => i.group);
   const rows = layout(caps, o.options, grouped ? 8 : 6);
@@ -103,7 +132,7 @@ export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]
         const lines = names.length ? wrap(names.join(c.g.sep.trim() ? c.g.sep : ' '), Math.max(20, caps.columns - 6)) : ['none'];
         return `${head}${c.done()}  ${o.message}\n${echo(caps, lines)}`;
       }
-      if (this.state === 'cancel') return `${head}${hex(caps, RED, c.g.cancel)}  ${o.message}\n${c.bar()}`;
+      if (this.state === 'cancel') return o.back && seen.esc ? backFrame(caps, o.message) : `${head}${hex(caps, RED, c.g.cancel)}  ${o.message}\n${c.bar()}`;
       const out: string[] = [];
       let lastGroup: string | undefined;
       o.options.forEach((item, i) => {
@@ -118,10 +147,11 @@ export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]
         const label = on ? shimmer(caps, r.label, anim.t) : r.label;
         out.push(`${c.live()}  ${grouped ? '  ' : ''}${box} ${label}${r.gap}${on ? r.hint : dim(caps, r.hint)}`);
       });
-      const footer = `${c.live(c.g.barEnd)}  ${dim(caps, 'space toggle · a all · enter confirm · esc cancel')}`;
+      const footer = `${c.live(c.g.barEnd)}  ${dim(caps, `space toggle · a all · enter confirm · ${escHint(o.back)}`)}`;
       return `${head}${c.live(c.g.step)}  ${o.message}\n${out.join('\n')}\n${footer}`;
     },
   });
+  const seen = escWatch(prompt);
   live(caps, prompt, anim);
-  return prompt.prompt() as Promise<V[] | symbol>;
+  return settle(prompt.prompt() as Promise<V[] | symbol>, seen, o.back);
 }

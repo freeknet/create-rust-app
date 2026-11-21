@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the crate name differs from the folder's.
 - `--help`, the README and CONTRACTS say what `--json` does without `--dry-run`: it writes the
   files but skips fetch, git, cargo check and `--open`.
+- Esc inside Customize steps back instead of quitting the run: on the Customize menu it returns
+  to the review, inside a section (or "Start over from a preset") it reopens the menu and drops
+  only that section's edits. The footer there says `esc back`. Ctrl-C still quits everywhere,
+  and Esc on the name, kind and review screens still cancels.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing

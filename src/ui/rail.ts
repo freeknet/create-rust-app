@@ -9,6 +9,7 @@ import { bold, dim, hex } from './rainbow.ts';
 import { glyphs } from './glyphs.ts';
 import { width } from './tty.ts';
 import { cascade, live, marker, sparkle, wave } from './motion.ts';
+import { backFrame, escHint, escWatch, settle } from './choose.ts';
 import type { Caps } from '../types.ts';
 
 export const COLORS = { live: '#7cf7ff', done: '#b6ff6e', rail: '#6f6a85', warn: '#ffd36e', error: '#ff6b7c' };
@@ -30,6 +31,8 @@ export function rail(caps: Caps) {
 export function text(caps: Caps, o: {
   message: string; placeholder?: string; defaultValue?: string; initialValue?: string;
   validate?: (v: string) => string | undefined;
+  /** Esc resolves to BACK (choose.ts) instead of cancelling; Ctrl-C still cancels. */
+  back?: boolean;
   io?: import('./choose.ts').Io;
 }) {
   const r = rail(caps);
@@ -42,7 +45,7 @@ export function text(caps: Caps, o: {
     render() {
       const head = `${r.bar()}\n`;
       if (this.state === 'submit') return `${head}${r.done()}  ${o.message}\n${r.bar()}  ${dim(caps, this.value ?? '')}`;
-      if (this.state === 'cancel') return `${head}${r.error(r.g.cancel)}  ${o.message}\n${r.bar()}`;
+      if (this.state === 'cancel') return o.back && seen.esc ? backFrame(caps, o.message) : `${head}${r.error(r.g.cancel)}  ${o.message}\n${r.bar()}`;
       // Only one line may change per animation tick (see motion.ts): here that's the marker, so the
       // cursor in front of the placeholder stays steady.
       const input = this.userInput
@@ -51,12 +54,13 @@ export function text(caps: Caps, o: {
       const err = this.state === 'error';
       const color = err ? COLORS.warn : COLORS.live;
       const step = err ? hex(caps, color, r.g.step) : marker(caps, r.g.step, anim.t);
-      const foot = err ? hex(caps, COLORS.warn, this.error) : dim(caps, 'enter confirm · esc cancel');
+      const foot = err ? hex(caps, COLORS.warn, this.error) : dim(caps, `enter confirm · ${escHint(o.back)}`);
       return `${head}${step}  ${o.message}\n${hex(caps, color, r.g.bar)}  ${input}\n${hex(caps, color, r.g.barEnd)}  ${foot}`;
     },
   });
+  const seen = escWatch(prompt);
   live(caps, prompt, anim);
-  return prompt.prompt() as Promise<string | symbol>;
+  return settle(prompt.prompt() as Promise<string | symbol>, seen, o.back);
 }
 
 /**
