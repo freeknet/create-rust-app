@@ -32,8 +32,23 @@ function assertUntouched(existing: string) {
   assert.equal(readFileSync(join(existing, 'precious.txt'), 'utf8'), 'mine');
 }
 
-/** Run the real CLI on a TTY; resolves once it exits. Returns its exit code and plain-text output. */
-async function runTty(args: string[], cwd: string, steps: { wait: number; keys?: string }[] = []) {
+const plain = (raw: string) => raw.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ''); // eslint-disable-line no-control-regex
+
+/**
+ * Run the real CLI on a TTY; resolves once it exits. Returns its exit code and plain-text output.
+ * Each step waits until the output matches `after`, then types `keys`, so a slow start (a loaded CI
+ * runner) can't make keys arrive before the prompt that should read them.
+ */
+async function runTty(args: string[], cwd: string, steps: { after: RegExp; keys: string }[] = []) {
+  // On Windows node-pty gives ConPTY's output worker 5 s to connect and otherwise reports exit
+  // code -1 without ever starting the CLI. That is the harness failing, not the CLI, so try again.
+  for (let attempt = 1; ; attempt++) {
+    const r = await runTtyOnce(args, cwd, steps);
+    if (!(r.code === -1 && r.out === '' && attempt < 3)) return r;
+  }
+}
+
+async function runTtyOnce(args: string[], cwd: string, steps: { after: RegExp; keys: string }[]) {
   const proc = pty.spawn(process.execPath, [BIN, ...args], {
     name: 'xterm-256color', cols: 100, rows: 40, cwd,
     env: { ...process.env, CI: '', NO_COLOR: '1' } as Record<string, string>,
@@ -42,15 +57,15 @@ async function runTty(args: string[], cwd: string, steps: { wait: number; keys?:
   let code: number | undefined;
   proc.onData((d) => { out += d; });
   proc.onExit((e) => { code = e.exitCode; });
+  const deadline = Date.now() + 30000;
   for (const s of steps) {
-    await sleep(s.wait);
-    if (s.keys && code === undefined) proc.write(s.keys);
+    while (code === undefined && Date.now() < deadline && !s.after.test(plain(out))) await sleep(50);
+    if (code !== undefined) break;
+    proc.write(s.keys);
   }
-  const deadline = Date.now() + 20000;
   while (code === undefined && Date.now() < deadline) await sleep(50);
   if (code === undefined) proc.kill();
-  // eslint-disable-next-line no-control-regex
-  return { code, out: out.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '') };
+  return { code, out: plain(out) };
 }
 
 test('targetProblem: missing and empty folders are fine, occupied ones are not', (t) => {
@@ -106,9 +121,9 @@ test('interactive: an occupied folder is refused before any question', async (t)
 test('interactive: the name prompt refuses an occupied folder, and Ctrl-C leaves it untouched', async (t) => {
   const { work, existing } = fixture(t);
   const { code, out } = await runTty([], work, [
-    { wait: 1800, keys: 'existing' },
-    { wait: 300, keys: '\r' },
-    { wait: 600, keys: '\x03' },
+    { after: /Project name/, keys: 'existing' },
+    { after: /existing/, keys: '\r' },
+    { after: /not empty/, keys: '\x03' },
   ]);
   assert.match(out, /not empty/, 'the prompt explains why');
   assert.ok(!out.includes('What are you building?'), 'it did not move on');
