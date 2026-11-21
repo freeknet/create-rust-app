@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A workspace without the changelog generator no longer mentions `cargo xtask changelog` in
+  `docs/decisions/D1.md`.
 - A workspace scaffolded `--without changelogGen` no longer ships `cargo xtask changelog`, which
   would have rewritten the hand-edited CHANGELOG.md: the module, command and help text are gated.
 - Generated projects are `cargo fmt --check` clean for every project name from 1 to 64 characters:

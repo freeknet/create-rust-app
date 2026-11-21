@@ -183,7 +183,8 @@ Cargo target auto-discovery is relied on: `src/lib.rs`, `src/main.rs`, `src/bin/
   it is in (`env!("CARGO_MANIFEST_DIR")`), expected module names exactly as `src/gen/header.ts`
   computes them, crate name from `env!("CARGO_PKG_NAME")`, workspace prefix = crate name snake-cased
   when the crate dir is under `crates/`. `tests/toolchain_pin.rs` finds `rust-toolchain.toml` at the
-  crate root or `../../` (workspace).
+  crate root or `../../` (workspace). Header lines may not pass 100 columns, except the `Module:`
+  line: its value is the file's path, which a long crate name can push past the limit.
 
 ## GUI runtime seam (`templates/gui` ↔ `templates/gui-glow`)
 
@@ -232,5 +233,9 @@ Generated code must pass `cargo fmt --check` on editions 2021 and 2024 under eve
   and merges derives across what were directive lines. Give gated imports their own `use` block.
 - Avoid brace imports mixing case classes (`{Icon, GRID}`) and adjacent `use` lines whose order differs
   between style editions; avoid `use @@crate@@::…` next to other `use`s.
+- No line's width may depend on the project name: names run to 64 characters, and rustfmt both wraps
+  lines that grow past 100 columns and re-joins ones that shrink. Outside the library, alias the
+  crate once (`use @@appCrateSnake@@ as app;`) and write `app::…`; inside it, use `crate::` constants
+  or `env!("CARGO_PKG_NAME")`. `test/name-length.test.ts` checks every preset at 1 and 64 characters.
 - No nested `if` inside `if let` (2024 clippy wants a let-chain, which doesn't compile on 2021).
 - Guard hook blocks go last in lib.rs (see "Crate shape").
