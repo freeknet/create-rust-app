@@ -74,6 +74,9 @@ cargo run --example screenshot                  # see the UI, without a window
 cargo run                                       # the app, debug
 cargo run --release                             # the app, as shipped
 <!-- @end -->
+<!-- @if changelogGen -->
+cargo run --example changelog                   # regenerate CHANGELOG.md
+<!-- @end -->
 <!-- @if cargoDeny -->
 cargo deny check                                # licences, advisories, sources
 <!-- @end -->
@@ -223,10 +226,24 @@ note saying what would clear it.
 
 `cargo xtask changelog` rebuilds it from `git tag` plus conventional-commit
 subjects, so an edit to a released section does not survive. Prose for a
-release belongs in the GitHub release body. **Never amend or rebase a
-commit after tagging it**: the tag keeps pointing at the discarded copy,
-and every release range computed from it is then wrong.
+release belongs in the GitHub release body. `cargo xtask changelog --check`
+compares the released sections with the history; CI does not run it, so
+run it before a release. **Never amend or rebase a commit after tagging
+it**: the tag keeps pointing at the discarded copy, and every release range
+computed from it is then wrong.
 <!-- @elif changelogGen -->
+
+### `CHANGELOG.md` is generated: never hand-edit it
+
+`cargo run --example changelog` rebuilds it from `git tag` plus
+conventional-commit subjects, so an edit to a released section does not
+survive. Prose for a release belongs in the GitHub release body.
+`cargo run --example changelog -- --check` compares the released sections
+with the history; CI does not run it, so run it before a release.
+**Never amend or rebase a commit after tagging it**: the tag keeps pointing
+at the discarded copy, and every release range computed from it is then
+wrong.
+<!-- @else -->
 
 ### `CHANGELOG.md` moves with the code
 

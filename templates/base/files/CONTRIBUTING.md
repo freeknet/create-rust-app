@@ -180,7 +180,17 @@ every entry is a conventional-commit subject, grouped under the release tag
 that shipped it. That is the other reason the commit prefixes matter: a
 subject that does not parse still appears, but in a catch-all section
 rather than the right one. Never hand-edit a released section; prose for a
-release belongs in the GitHub release body.
+release belongs in the GitHub release body. `cargo xtask changelog --check`
+compares the released sections with the history.
+<!-- @elif changelogGen -->
+`CHANGELOG.md` is rebuilt from the git history by
+`cargo run --example changelog`: every entry is a conventional-commit
+subject, grouped under the release tag that shipped it. That is the other
+reason the commit prefixes matter: a subject that does not parse still
+appears, but in a catch-all section rather than the right one. Never
+hand-edit a released section; prose for a release belongs in the GitHub
+release body. `cargo run --example changelog -- --check` compares the
+released sections with the history.
 <!-- @else -->
 `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Add a line under `## [Unreleased]` in the same pull request as the change,
@@ -190,9 +200,20 @@ Fixed, and so on.
 
 ## Cutting a release
 
+<!-- @if changelogGen & workspace -->
+1. On a release branch off `main`: bump `version` in `Cargo.toml` and
+   commit. The changelog follows the tag: once the tag is pushed (step 3),
+   run `cargo xtask changelog` and commit the result. A commit that touches
+   only `CHANGELOG.md` is left out of every section.
+<!-- @elif changelogGen -->
+1. On a release branch off `main`: bump `version` in `Cargo.toml` and
+   commit, then run `cargo run --example changelog -- --release v0.2.0`,
+   which writes the section for the tag about to be cut, and commit that.
+<!-- @else -->
 1. On a release branch off `main`: bump `version` in `Cargo.toml`, move the
    `Unreleased` entries under a new `## [x.y.z] - YYYY-MM-DD` heading in
    `CHANGELOG.md`, and commit.
+<!-- @end -->
 2. Open the pull request and let the checks pass.
 3. Merge (a merge commit, so the history the changelog describes survives),
    then tag the merge commit, annotated:

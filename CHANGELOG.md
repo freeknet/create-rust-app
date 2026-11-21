@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The generated release build no longer restores `Swatinem/rust-cache`: the Actions cache is
   writable from any branch's CI, so a tagged build could have shipped a poisoned entry (zizmor
   `cache-poisoning`, high).
+- A fresh project's `CHANGELOG.md` is what its generator writes: `cargo run --example changelog --
+  --check` passes straight after scaffolding and regenerating is a no-op (`cargo xtask changelog`
+  on workspaces too). Both generators share the header, `Unreleased` entries carry no commit hash
+  (released ones still do), and CLAUDE.md / CONTRIBUTING.md say the file is generated and name
+  the command whenever the generator ships.
 - This repo's CI pins `actions/setup-node` to a full commit SHA (v7.1.0) and checks out without
   persisting the token.
 
