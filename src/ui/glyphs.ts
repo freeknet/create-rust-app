@@ -16,6 +16,8 @@ export interface Glyphs {
   radioOn: string; radioOff: string; boxOn: string; boxOff: string; ok: string; fail: string;
   tl: string; tr: string; bl: string; br: string; h: string; v: string; tee: string;
   rule: string; spinner: string[]; sep: string; ellipsis: string; up: string; down: string; cursor: string;
+  /** Focus mark and in-text caret for when colour is off and can't show either. */
+  focus: string; caret: string;
 }
 
 const FULL: Glyphs = {
@@ -23,12 +25,13 @@ const FULL: Glyphs = {
   radioOn: '●', radioOff: '○', boxOn: '◼', boxOff: '◻', ok: '✔', fail: '✖',
   tl: '╭', tr: '╮', bl: '╰', br: '╯', h: '─', v: '│', tee: '├',
   rule: '━', spinner: ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'], sep: ' · ', ellipsis: '…', up: '↑', down: '↓', cursor: '█',
+  focus: '›', caret: '▏',
 };
 
 const CONSOLE: Glyphs = {
   ...FULL,
   step: '♦', done: '◊', boxOn: '■', boxOff: '□', ok: '√', fail: '×',
-  spinner: ['░', '▒', '▓', '█', '▓', '▒'],
+  spinner: ['░', '▒', '▓', '█', '▓', '▒'], caret: '|',
 };
 
 const ASCII: Glyphs = {
@@ -36,6 +39,7 @@ const ASCII: Glyphs = {
   radioOn: '>', radioOff: ' ', boxOn: '[x]', boxOff: '[ ]', ok: '[ok]', fail: '[x]',
   tl: '+', tr: '+', bl: '+', br: '+', h: '-', v: '|', tee: '+',
   rule: '=', spinner: ['-', '\\', '|', '/'], sep: ' / ', ellipsis: '...', up: 'up', down: 'down', cursor: '_',
+  focus: '>', caret: '|',
 };
 
 export function glyphs(caps: Pick<Caps, 'glyphs'>): Glyphs {

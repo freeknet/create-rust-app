@@ -156,7 +156,8 @@ impl Cli {
                 "-h" | "--help" => return Ok(Parsed::Print(help())),
                 "-V" | "--version" => {
                     return Ok(Parsed::Print(format!(
-                        "@@name@@ {}",
+                        "{} {}",
+                        crate::APP_ID,
                         env!("CARGO_PKG_VERSION")
                     )));
                 }
@@ -177,8 +178,9 @@ impl Cli {
 /// The `--help` text.
 fn help() -> String {
     let mut text = format!(
-        "{}\n\nUsage: @@name@@ [OPTIONS]\n\nOptions:\n",
-        crate::TAGLINE
+        "{}\n\nUsage: {} [OPTIONS]\n\nOptions:\n",
+        crate::TAGLINE,
+        crate::APP_ID
     );
     // @if config
     // @if themes
@@ -198,9 +200,12 @@ mod tests {
     // @if clap
     use clap::Parser as _;
 
+    /// The program name the parser sees first.
+    const BIN: &str = "@@bin@@";
+
     /// Parses `args` after a program name.
     fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
-        Cli::try_parse_from(std::iter::once("@@bin@@").chain(args.iter().copied()))
+        Cli::try_parse_from(std::iter::once(BIN).chain(args.iter().copied()))
     }
     // @else
 

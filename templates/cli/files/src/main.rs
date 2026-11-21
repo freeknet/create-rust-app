@@ -3,7 +3,7 @@
 // Description:  Entry point: hands the process arguments and stdout to the
 //               library and turns its result into an exit code.
 //
-// Dependencies: @@crate@@ (the library), anyhow
+// Dependencies: the library crate, anyhow
 // ============================================================================
 
 //! Entry point for `@@bin@@`.
@@ -13,13 +13,15 @@
 //! returned from `main` prints its whole context chain to stderr and exits
 //! with code 1.
 
+use @@crate@@ as app;
+
 // @if async_tokio
 #[tokio::main]
 async fn main() -> anyhow::Result<std::process::ExitCode> {
-    @@crate@@::run(std::env::args_os(), &mut std::io::stdout().lock()).await
+    app::run(std::env::args_os(), &mut std::io::stdout().lock()).await
 }
 // @else
 fn main() -> anyhow::Result<std::process::ExitCode> {
-    @@crate@@::run(std::env::args_os(), &mut std::io::stdout().lock())
+    app::run(std::env::args_os(), &mut std::io::stdout().lock())
 }
 // @end

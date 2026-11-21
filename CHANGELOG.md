@@ -9,6 +9,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- On Windows the target folder in the review hint, the `cd` line and the recreate command uses `/`
+  separators (`out/app`, `D:/proj/app`), so Git Bash no longer eats the backslashes and the
+  recreate command needs no quoting for them.
+- A workspace without the changelog generator no longer mentions `cargo xtask changelog` in
+  `docs/decisions/D1.md`.
+- A workspace scaffolded `--without changelogGen` no longer ships `cargo xtask changelog`, which
+  would have rewritten the hand-edited CHANGELOG.md: the module, command and help text are gated.
+- Generated projects are `cargo fmt --check` clean for every project name from 1 to 64 characters:
+  lines that grew with the name (GUI `build.rs`, `main.rs`, `config.rs`, the screenshot and brand
+  examples, CLI `main.rs` and tests, the TUI log path) now name the crate through a short alias
+  (`use <crate> as app;`) or a constant, so rustfmt's layout no longer depends on the name.
+  GUI projects of 14+ characters, workspaces of 16+, used to fail. `test/name-length.test.ts`
+  guards it.
+- Projects with long names pass their own header check: `Dependencies:` lines name "the library
+  crate" instead of its (up to 68-character) path, and the check no longer counts the `Module:`
+  line, whose value is the file's path, against the 100-column limit.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` passes on eframe GUI projects (a private and a
+  redundant intra-doc link in `src/gui/run.rs`) and with `--with tray` off Windows (`src/tray.rs`
+  linked the Windows-only `win::tray`), and for a `cli` with SQLite (`src/db.rs` linked the private
+  `MIGRATIONS`).
+- Generated docs say what the project has: the `unsafe` boundary check names `src/win/` (plus
+  `src/gui/run/` on winit-glow) instead of a `src/gui/run/` an eframe project doesn't have, and
+  the app and shortcut docs mention the tray and command palette only when they are enabled.
+- Project names that cannot build are refused up front, on the command line and in the name
+  prompt: Rust keywords from every edition (`fn`, `type`, `gen`, `try` …), Cargo-reserved names
+  (`build`, `deps` …), Windows device names (`con`, `nul` …), and names over 64 characters (the
+  crates.io limit, which `--bin` now shares). A long name used to die mid-write.
+- A target folder whose name can't be a crate name (`create-rust-app MyDir -y`) still gets the
+  default crate name, but a one-line note on stderr now says so and points at `--name`.
+- An MSRV newer than the pinned toolchain, or older than the edition allows (2024 needs 1.85),
+  is an argument error (exit 2), whether it came from `--msrv`, `--toolchain`, `--set` or a preset.
+  It used to scaffold a project cargo then refused to build.
+- Options the chosen kind ignores (`--preset lib --with tray`, `--preset lib --bin foo`,
+  `--preset cli --gui winit-glow`, `subcommands` on a TUI or without clap) each print a one-line
+  note on stderr instead of vanishing silently; `--quiet` hides them. `--json` reports `guiStack`
+  as `""` for kinds without a GUI, as it already did `themeBase`.
+- An empty tagline reads as the project name everywhere: the README's bold line used to come out
+  as `****` while `Cargo.toml` already fell back to the name.
+- Scaffolding into a folder that holds only a fresh `git init` makes the first commit there,
+  staging the generated files by path (anything else in the folder stays untracked). Inside some
+  other repository git is still skipped, and the finished summary no longer promises a commit.
+- A write that fails midway no longer leaves a partial project: a folder the run created is
+  removed, and in an existing folder only the files the run added are, with the error saying
+  which. `--force` lists the existing files it overwrote on stderr.
+- The "again without prompts" command recreates the same project: it carries `--accent`,
+  `--author`, `--github`, display name and email, names the real target folder, and adds `--name`
+  when the crate name differs from the folder's.
+- `--help`, the README and CONTRACTS say what `--json` does without `--dry-run`: it writes the
+  files but skips fetch, git, cargo check and `--open`.
+- Esc inside Customize steps back instead of quitting the run: on the Customize menu it returns
+  to the review, inside a section (or "Start over from a preset") it reopens the menu and drops
+  only that section's edits. The footer there says `esc back`. Ctrl-C still quits everywhere,
+  and Esc on the name, kind and review screens still cancels.
+- Ctrl-C during the run steps (writing, `cargo fetch`, `git init`, `cargo check`) shows the
+  cursor again, settles the spinner line and says the partly created folder was left in place,
+  then exits 130. The cursor used to stay hidden, with no message.
+- "Start over from a preset" uses the preset you pick even when `--kind` or `--preset` was given;
+  it used to keep the flag's kind (`--kind lib`, start over as a desktop app: still a library).
+- With a positional folder, the review's "Create it" hint names that folder
+  (`create-rust-app fl-dir`, renamed in Customize: `writes ./fl-dir`, not the new name).
+- The Licence + Rust prompts cross-check what you type, as the flags do: an MSRV older than the
+  edition allows, or a toolchain older than the MSRV, is refused inline with the reason; spaces
+  around a version are trimmed. A long message wraps on the rail instead of past the edge.
+- Lists taller than the terminal scroll: the window follows the focused row, with "↑ n more" /
+  "↓ n more" lines, and no stale frame lines are left in the scrollback after a choice.
+- At 40 columns no option row, footer or prompt message wraps: descriptions shorten, then drop,
+  then labels are cut with an ellipsis, and footers drop their least useful hints first. The
+  terminal size is read on every frame, so a resize is honoured.
+- Without colour (`NO_COLOR`, `--no-color`) the focused multi-select row gets a `›` mark (`>` in
+  ASCII) and the text cursor shows as a caret glyph, where both used to be invisible.
+  `--no-color` now emits no colour escape codes at all: the text prompt's inverse-video cursor
+  ignored the flag.
+
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing
   (`src/win/console.rs`). Opening the window never attaches, so closing the terminal doesn't close
@@ -32,9 +105,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   committed what was there, printed success and exited 0. Occupied folders are now refused before
   any question (unless `--force`), and a failed write stops the run with exit code 1.
 - Animated prompts no longer flicker.
+- Generated workflows check out with `persist-credentials: false`, so the job token is not left
+  in `.git/config` for build scripts to read (zizmor `artipacked`). No step needed it: `gh`
+  authenticates with `GH_TOKEN`.
+- The generated release build no longer restores `Swatinem/rust-cache`: the Actions cache is
+  writable from any branch's CI, so a tagged build could have shipped a poisoned entry (zizmor
+  `cache-poisoning`, high).
+- A fresh project's `CHANGELOG.md` is what its generator writes: `cargo run --example changelog --
+  --check` passes straight after scaffolding and regenerating is a no-op (`cargo xtask changelog`
+  on workspaces too). Both generators share the header, `Unreleased` entries carry no commit hash
+  (released ones still do), and CLAUDE.md / CONTRIBUTING.md say the file is generated and name
+  the command whenever the generator ships.
+- Generated docs: the README says a theme is eleven colours, as the themes do; CLAUDE.md and
+  CONTRIBUTING.md no longer claim a check enforces `assert!` messages, and list every place the
+  header check walks (`benches/`, `build.rs` too) with each module-name form; the GUI README lists
+  the Linux runtime libraries; CONTRIBUTING says attestation needs a public repository or GitHub
+  Enterprise Cloud; the release workflow's matrix comment says what else a new target needs.
+- This repo's docs match the code: CONTRACTS lists `post.fetch` and every binary extension the
+  engine copies raw, PLAN's `npm pack` check names `dist/` and `templates/`, and the changelog's
+  CI line names Node 22 and 26 (the `engines` floor is 22.18).
+- This repo's CI pins `actions/setup-node` to a full commit SHA (v7.1.0) and checks out without
+  persisting the token.
 
 ### Changed
 
+- TUI projects build on ratatui 0.30 and crossterm 0.29 (were 0.29 and 0.28); the templates needed
+  no code changes, and the scaffold still builds on the 1.98 MSRV.
 - The classic Windows console gets 24-bit colour, block letters and a glyph set its font can draw,
   instead of an ASCII fallback.
 - Motion: shimmering focused option, cycling marker, wave spinner, live file and crate counters,
@@ -53,6 +149,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `scaffold-check` gains `--gate fmt` (rustfmt only, no build), `--gate doc` (`cargo doc --no-deps`
+  with `RUSTDOCFLAGS=-D warnings`, opt-in) and `--name <name>`; it splits `--set` on the first `=`
+  and keeps an existing `CARGO_TARGET_DIR`.
 - `--with subcommands` on desktop apps: `app <job>` runs a headless job (`themes`, `paths` to start
   with) and exits, a bare run opens the window as before, and `tests/cli.rs` covers both paths.
 - `--base <theme>`: lay the signature theme's accent on any shipped theme's surfaces, e.g.
@@ -69,7 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README documents `--set`, `--bin` and `--preset custom`.
 - Project README covering presets, CLI flags, Rust conventions, and contributing.
 - MIT license, copyright 2026 Lawrence Norton.
-- Node 20, 22, and 26 CI on Linux and Windows, plus per-preset Rust scaffold checks.
+- Node 22 and 26 CI on Linux and Windows, plus per-preset Rust scaffold checks.
 - Weekly Dependabot updates for npm dependencies and GitHub Actions.
 - In-process preset e2e checks for rendered tokens, directives, unique destinations,
   and path-derived Rust module headers.

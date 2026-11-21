@@ -127,7 +127,7 @@ export function singleManifest(ctx: Ctx, deps: Dep[]) {
     'version = "0.1.0"',
     `edition = ${q(ctx.edition)}`,
     `rust-version = ${q(ctx.msrv)}`,
-    `description = ${q(ctx.tagline || ctx.name)}`,
+    `description = ${q(ctx.tagline)}`,
     `authors = ${authors(ctx)}`,
     licenseLines(ctx),
     repoUrl(ctx) && `repository = ${q(repoUrl(ctx))}`,
@@ -210,7 +210,7 @@ workspace = true
 
   return [
     { dest: 'Cargo.toml', content: root },
-    { dest: `crates/${ctx.appCrate}/Cargo.toml`, content: member(ctx.appCrate, ctx.tagline || ctx.name, deps.filter((d: Dep) => (d.crate ?? 'app') === 'app')) },
+    { dest: `crates/${ctx.appCrate}/Cargo.toml`, content: member(ctx.appCrate, ctx.tagline, deps.filter((d: Dep) => (d.crate ?? 'app') === 'app')) },
     { dest: 'crates/xtask/Cargo.toml', content: member('xtask', `Project automation for ${ctx.name}: \`cargo xtask <task>\`.`, deps.filter((d: Dep) => d.crate === 'xtask')) },
   ];
 }

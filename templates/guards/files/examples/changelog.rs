@@ -49,9 +49,12 @@
 //!   `.github/workflows/release.yml` owns.
 //! - **`--check` compares released sections only.** The `Unreleased`
 //!   section is deliberately exempt, because its content changes with
-//!   every merge — and a squash or rebase rewrites the very hashes it
-//!   would be pinned to. Gating a pull request on it would fail every
-//!   pull request for no signal.
+//!   every merge. Gating a pull request on it would fail every pull
+//!   request for no signal.
+//! - **`Unreleased` entries carry no commit hash.** A squash or rebase
+//!   rewrites hashes before they ship; released entries link theirs. It
+//!   also lets the scaffolded file, written before its own commit
+//!   existed, match what this generates from that first commit.
 //!
 //! - **A version tag no branch can reach is a hard error under `--check`.**
 //!   Each release is computed as `<previous>..<tag>`, so a tag left pointing
@@ -75,8 +78,24 @@ use anyhow::{Context, Result, bail};
 const CHANGELOG: &str = "CHANGELOG.md";
 
 /// Used to build the commit and compare links. Taken from `Cargo.toml`'s
-/// `repository` field rather than guessed.
-const REPO: &str = "https://github.com/@@github@@/@@name@@";
+/// `repository` field rather than guessed. Split so the line stays within
+/// rustfmt's width for any project name.
+const REPO: &str = "https://github.com/\
+     @@github@@/@@name@@";
+
+/// Everything above the `Unreleased` heading. The scaffolded
+/// `CHANGELOG.md` opens with exactly this text, so a fresh project already
+/// matches its own history.
+const PREAMBLE: &str = "# Changelog\n\
+     \n\
+     All notable changes to @@name@@, newest first.\n\
+     \n\
+     **This file is generated.** It is rebuilt from the git history by\n\
+     `cargo run --example changelog`, so released sections are rewritten in\n\
+     place and edits to them do not survive. See `CONTRIBUTING.md`.\n\
+     \n\
+     The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n\
+     and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n";
 
 /// Heading for commits that have not shipped in a tagged release yet.
 const UNRELEASED: &str = "## [Unreleased]";
@@ -582,17 +601,7 @@ fn parse_subject(hash: &str, short: &str, subject: &str) -> Commit {
 fn render(releases: &[Release], unreleased: &[Commit]) -> String {
     let mut out = String::new();
 
-    out.push_str("# Changelog\n\n");
-    out.push_str("All notable changes to @@name@@, newest first.\n\n");
-    out.push_str(
-        "**This file is generated.** It is rebuilt from the git history by\n\
-         `cargo run --example changelog`, so released sections are rewritten in\n\
-         place and edits to them do not survive. See `CONTRIBUTING.md`.\n\n",
-    );
-    out.push_str(
-        "The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n\
-         and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n",
-    );
+    out.push_str(PREAMBLE);
 
     out.push('\n');
     out.push_str(UNRELEASED);
@@ -600,7 +609,7 @@ fn render(releases: &[Release], unreleased: &[Commit]) -> String {
     if unreleased.is_empty() {
         out.push_str("\nNothing yet — the latest release is the tip of `main`.\n");
     } else {
-        push_sections(&mut out, unreleased);
+        push_sections(&mut out, unreleased, false);
     }
 
     for release in releases {
@@ -608,7 +617,7 @@ fn render(releases: &[Release], unreleased: &[Commit]) -> String {
         if release.commits.is_empty() {
             out.push_str("\nNo commits recorded against this tag.\n");
         } else {
-            push_sections(&mut out, &release.commits);
+            push_sections(&mut out, &release.commits, true);
         }
     }
 
@@ -617,8 +626,10 @@ fn render(releases: &[Release], unreleased: &[Commit]) -> String {
 }
 
 /// The `### Heading` blocks for one release, in `SECTIONS` order, skipping
-/// any heading nothing landed under.
-fn push_sections(out: &mut String, commits: &[Commit]) {
+/// any heading nothing landed under. `linked` adds each commit's short
+/// hash and a link to it; the `Unreleased` section goes without, because
+/// a squash or rebase rewrites those hashes before they ship.
+fn push_sections(out: &mut String, commits: &[Commit], linked: bool) {
     let mut order: Vec<&str> = vec![BREAKING];
     order.extend(SECTIONS.iter().map(|(heading, _)| *heading));
     order.push(OTHER);
@@ -634,10 +645,14 @@ fn push_sections(out: &mut String, commits: &[Commit]) {
                 Some(scope) => format!("**{scope}:** "),
                 None => String::new(),
             };
-            out.push_str(&format!(
-                "- {scope}{} ([`{}`]({REPO}/commit/{}))\n",
-                commit.summary, commit.short, commit.hash
-            ));
+            if linked {
+                out.push_str(&format!(
+                    "- {scope}{} ([`{}`]({REPO}/commit/{}))\n",
+                    commit.summary, commit.short, commit.hash
+                ));
+            } else {
+                out.push_str(&format!("- {scope}{}\n", commit.summary));
+            }
         }
     }
 }

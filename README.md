@@ -86,14 +86,14 @@ create-rust-app [dir] [options]
 | Flag | Meaning |
 |---|---|
 | `[dir]` | Target directory (defaults to the project name) |
-| `--name <kebab>` | Crate / project name, `^[a-z][a-z0-9-]*$` |
-| `--bin <name>` | Executable name when it differs from the crate (writes `[[bin]]`; clap, README and release follow it) |
+| `--name <kebab>` | Crate / project name, `^[a-z][a-z0-9-]*$`, at most 64 characters; not a Rust keyword (`fn`, `type`, `gen` …), `test`/`std`/`core`/`alloc`/`proc-macro`, a Cargo-reserved name (`build`, `deps`, `examples`, `incremental`) or a Windows device name (`con`, `nul` …) |
+| `--bin <name>` | Executable name when it differs from the crate (writes `[[bin]]`; clap, README and release follow it). Lowercase letters, digits, `-` and `_`, at most 64 characters, same Cargo and Windows reserved names |
 | `--preset <p>` | `rustaman` `strobe` `cli` `tui` `lib` `minimal`, or `custom` for no preset (the defaults) |
 | `--kind <k>` | `cli` `gui` `tui` `lib` `workspace` |
 | `--gui <stack>` | `eframe` (wgpu) or `winit-glow` (winit + glutin + egui_glow) |
 | `--base <theme>` | Surfaces the signature theme lays your accent on: any shipped theme id, e.g. `graphite` for neutral greys (default `midnight`) |
 | `--edition <e>` | `2024` or `2021` |
-| `--msrv <v>` | `rust-version` in Cargo.toml (default `1.98`) |
+| `--msrv <v>` | `rust-version` in Cargo.toml (default `1.98`); no newer than `--toolchain`, and at least `1.85` for edition 2024 (`1.56` for 2021) |
 | `--toolchain <v>` | Exact channel pinned in `rust-toolchain.toml` and CI (default `1.99.1`) |
 | `--license <l>` | `MIT`, `MIT+CommonsClause`, `Apache-2.0`, `MIT OR Apache-2.0` |
 | `--author <name>` | Author for Cargo.toml, LICENSE, headers |
@@ -110,10 +110,10 @@ create-rust-app [dir] [options]
 | `--no-cargo-check` | Skip `cargo check` even if a preset turns it on |
 | `--open <editor>` | Open the project in `code` or `cursor` when done |
 | `--dry-run` | Print the plan, write nothing |
-| `--json` | Machine-readable output |
+| `--json` | Machine-readable output: prints only `{ answers, files }` on stdout (notes go to stderr). Without `--dry-run` it still writes the files, but skips `cargo fetch`, git, `cargo check` and `--open`; `answers.post` shows what was asked, not what ran |
 | `--no-color` | Plain output (also honoured: `NO_COLOR`, non-TTY, `CI`) |
 | `--quiet` | Only errors |
-| `--force` | Write into a non-empty directory |
+| `--force` | Write into a non-empty directory; lists the existing files it overwrote on stderr |
 | `--help`, `--version` | The usual |
 
 A non-TTY stdin implies `--yes`. Answer flags apply left to right, so a later `--set` or

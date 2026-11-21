@@ -10,14 +10,14 @@
 //! The runtime.
 //!
 //! The only file in the crate that names eframe. [`run`] opens the window
-//! and hands each frame to [`App`](super::app::App), which uses egui alone.
+//! and hands each frame to [`App`], which uses egui alone.
 //!
 //! ## eframe on wgpu, not glow
 //!
 //! eframe's glow path goes through WGL on Windows, which fails on machines
 //! with a stale or hybrid OpenGL driver — common on switchable-graphics
 //! laptops. wgpu talks to D3D12 instead, and on Windows it is pinned to
-//! D3D12 alone ([`backends`]): leaving Vulkan in the set lets wgpu pick a
+//! D3D12 alone (`backends`): leaving Vulkan in the set lets wgpu pick a
 //! vendor ICD, which is the same class of driver the switch away from GL was
 //! made to avoid. `WGPU_BACKEND` still overrides it.
 

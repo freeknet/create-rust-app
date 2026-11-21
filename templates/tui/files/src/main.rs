@@ -3,7 +3,7 @@
 // Description:  Entry point: hands the process arguments to the library and
 //               turns its result into an exit code.
 //
-// Dependencies: @@crate@@ (the library), anyhow
+// Dependencies: the library crate, anyhow
 // ============================================================================
 
 //! Entry point for `@@bin@@`.

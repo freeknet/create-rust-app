@@ -12,18 +12,21 @@ bin/create-rust-app.ts     entry; imports src/cli.ts and calls main(process.argv
 src/cli.ts                 main(argv): args → answers → ctx → plan → write → post → summary
 src/args.ts                parseArgv(argv) → { dir, flags, overrides } (node:util parseArgs)
 src/presets.ts             PRESETS: Record<id, Partial<Answers>>; DEFAULTS: Answers
-src/prompts.ts             ask(partial, caps, targetCheck) → Answers   (@clack/core)
+src/prompts.ts             ask(partial, caps, targetCheck, dir?) → Answers   (@clack/core)
 src/context.ts             buildContext(answers) → Ctx                 (CORE, exists)
 src/engine/directives.ts   applyDirectives(text, flags) → text         (CORE, exists)
 src/engine/render.ts       renderText(text, ctx, dest) → text          (CORE, exists)
 src/engine/groups.ts       GROUPS: [{ id, when(ctx) }]                 (CORE, exists)
 src/engine/plan.ts         buildPlan(ctx) → Promise<PlanEntry[]>       (CORE, exists)
-src/engine/write.ts        writePlan(plan, targetDir, {force, dryRun, onFile}); targetProblem(dir)
+src/engine/write.ts        writePlan(plan, targetDir, {force, dryRun, onFile}); targetProblem(dir); existingFiles(plan, dir)
+                           (on a failed write, writePlan removes the target if it created it, else only what it added)
 src/gen/header.ts          moduleFor(dest, ctx) → string               (CORE, exists)
 src/gen/index.ts           generate(ctx) → PlanEntry[]                 (Cargo.toml, deny.toml …)
 src/gen/cargo.ts, deps.ts, deny.ts
 src/post/{git,cargo,open}.ts
-src/reproduce.ts           reproduceCommand(answers, dir?) → string
+src/reproduce.ts           reproduceCommand(answers, dir?) → string; shownTarget(dir, name, cwd?) → string
+                           (dir = the real target as shownTarget prints it; adds --name when it differs
+                           from the folder's name; carries every answer that differs from the preset)
 src/ui/{tty,glyphs,rainbow,banner,theme,labels,choose,rail,motion,spinner}.ts
 templates/<group>/files/** template files; templates/<group>/manifest.js optional
 test/*.test.ts             node --test
@@ -46,16 +49,38 @@ test/*.test.ts             node --test
               commandPalette, screenshotExample, demo, subcommands }, // all bool; subcommands: cli or GUI kinds, with clap
   tooling:  { ci, release, cargoDeny, dependabot, toolchainPin, agentDocs, headerCheck,
               unsafeCheck, changelogGen, issueTemplates, codeowners, securityMd }, // all bool
-  post:     { git: bool, cargoCheck: bool, open: 'none'|'code'|'cursor' },
+  post:     { git: bool, fetch: bool, cargoCheck: bool, open: 'none'|'code'|'cursor' },
   preset:   string | null,
 }
 ```
+
+## Validation (src/context.ts, shared by flags, `--set` and prompts)
+
+- `validateName(name) → string | null`: `^[a-z][a-z0-9-]*$`, at most `MAX_NAME_LENGTH` (64, the
+  crates.io limit), no trailing or doubled dash, not `test core std alloc proc-macro`, not a Rust
+  keyword (`RUST_KEYWORDS`: strict and reserved, editions 2015–2024), not Cargo-reserved
+  (`CARGO_RESERVED`: `deps examples build incremental`), not a Windows device name (`WINDOWS_DEVICE_RE`).
+- `validateBin(bin) → string | null`: `^[a-z][a-z0-9_-]*$`, at most 64, the same Cargo and Windows rules.
+- `validateRustVersions(msrv, toolchain, edition) → string | null`: cross-field, run by `src/cli.ts`
+  after flags, `--set` and preset defaults resolve (and again after the prompts); exit 2. `msrv` ≤
+  `toolchain` (numeric compare) and `msrv` ≥ `EDITION_MIN_RUST[edition]` (2021: 1.56, 2024: 1.85).
+
+## `--json`
+
+Prints `{ answers: ReportedAnswers, files: string[] }` and nothing else on stdout; notes and errors
+go to stderr. Without `--dry-run` it writes the files but runs no post-step (fetch, git, cargo check,
+open); `answers.post` echoes the request, not what ran. Whether it should run them is undecided.
 
 ## Ctx = Answers + derived
 
 `buildContext(answers)` first applies `effectiveAnswers(answers)` (src/context.ts): options the kind
 never generates are set to `false` (desktop features and `unsafeCheck` without a GUI; `config` for
-`lib`, `tui`, and `cli` without serde). The Ctx and `--json` both carry these effective values.
+`lib`, `tui`, and `cli` without serde). The Ctx and `--json` both carry these effective values;
+`--json` reports `reportedAnswers(answers)` (type `ReportedAnswers`), which also reads `guiStack: ''`
+without a GUI, like `themeBase`. The Ctx keeps a stack value there; no flag or token reads it.
+`ignoredOptions(overrides, answers) → string[]` names each explicitly given option the kind drops
+(`--with tray` on a lib, `--bin` on a lib, `--gui` without a GUI, `subcommands` without clap or on a
+TUI/lib …); a non-interactive run prints each as a `note:` line on stderr unless `--quiet`.
 It then adds: `crate` (snake), `Name` (Pascal), `NAME` (SCREAMING),
 `year`, `appCrate` (workspace: `<name>-app`, else `<name>`), `flags: Set<string>`, `tokens`.
 
@@ -92,7 +117,8 @@ Unknown tokens throw (so a typo fails tests loudly).
 - Optional `templates/<id>/manifest.js`: `export default function (ctx, files) → files'` where
   `files` is `[{ src, dest }]` (absolute src, relative dest). Use it to drop or rename files.
   Without a manifest all files are included.
-- Binary files (`.png .ico .ttf .otf .woff2 .zip`) are copied raw. Everything else is text and goes
+- Binary files (`.png .ico .ttf .otf .woff .woff2 .zip .jpg .jpeg .gif .wav`, case-insensitive;
+  `BINARY` in `src/engine/plan.ts`) are copied raw. Everything else is text and goes
   through `renderText`.
 - Line directives work in any text file. A line whose trimmed content, after an optional comment
   leader (`//`, `#`, `<!--`, `--`, `;`), is `@if EXPR`, `@elif EXPR`, `@else`, or `@end` (an
@@ -157,7 +183,8 @@ Cargo target auto-discovery is relied on: `src/lib.rs`, `src/main.rs`, `src/bin/
   it is in (`env!("CARGO_MANIFEST_DIR")`), expected module names exactly as `src/gen/header.ts`
   computes them, crate name from `env!("CARGO_PKG_NAME")`, workspace prefix = crate name snake-cased
   when the crate dir is under `crates/`. `tests/toolchain_pin.rs` finds `rust-toolchain.toml` at the
-  crate root or `../../` (workspace).
+  crate root or `../../` (workspace). Header lines may not pass 100 columns, except the `Module:`
+  line: its value is the file's path, which a long crate name can push past the limit.
 
 ## GUI runtime seam (`templates/gui` ↔ `templates/gui-glow`)
 
@@ -185,12 +212,14 @@ bannerFrame(caps, frame) → string[]; showBanner(caps) → Promise<void>
 // labels.ts: the words for every option; prompts, review and --help all read these
 FEATURES, TOOLING, CRATE_TOGGLES, LOGGING, ASYNC, HTTP, LICENSES, STACKS, KINDS, grouped(catalogue)
 // choose.ts
-pick(caps, { message, options: Item[], initialValue?, io? }) → value | cancel symbol
-pickMany(caps, { message, options: Item[], initialValues?, io? }) → values | cancel symbol
+pick(caps, { message, options: Item[], initialValue?, back?, io? }) → value | cancel symbol | BACK
+pickMany(caps, { message, options: Item[], initialValues?, back?, io? }) → values | cancel symbol | BACK
+// back: true → Esc resolves to BACK (footer `esc back`); Ctrl-C always resolves to the cancel symbol
 // rail.ts
-text(caps, { message, placeholder?, defaultValue?, initialValue?, validate?, io? }) → string | cancel symbol
+text(caps, { message, placeholder?, defaultValue?, initialValue?, validate?, back?, io? }) → string | cancel symbol | BACK
 note(caps, title, body); box(caps, title, lines); log(caps, lines); outro(caps, msg); cancel(caps, msg)
 tasks(caps, Task[]) → Promise<boolean>  // false as soon as a `required` task fails; later tasks don't run
+// tasks(caps, list, { interrupted }): Ctrl-C restores the cursor, prints `interrupted`, exits 130
 // motion.ts: one animated line per prompt
 live(caps, prompt, state); marker(caps, glyph, t); shimmer(caps, text, t); wave(caps, frame)
 cascade(caps, lines); sparkle(caps, prefix, text)
@@ -206,5 +235,9 @@ Generated code must pass `cargo fmt --check` on editions 2021 and 2024 under eve
   and merges derives across what were directive lines. Give gated imports their own `use` block.
 - Avoid brace imports mixing case classes (`{Icon, GRID}`) and adjacent `use` lines whose order differs
   between style editions; avoid `use @@crate@@::…` next to other `use`s.
+- No line's width may depend on the project name: names run to 64 characters, and rustfmt both wraps
+  lines that grow past 100 columns and re-joins ones that shrink. Outside the library, alias the
+  crate once (`use @@appCrateSnake@@ as app;`) and write `app::…`; inside it, use `crate::` constants
+  or `env!("CARGO_PKG_NAME")`. `test/name-length.test.ts` checks every preset at 1 and 64 characters.
 - No nested `if` inside `if let` (2024 clippy wants a let-chain, which doesn't compile on 2021).
 - Guard hook blocks go last in lib.rs (see "Crate shape").

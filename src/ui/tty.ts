@@ -65,6 +65,20 @@ export function columns(value: number | undefined) {
   return Number.isFinite(value) && Number(value) > 0 ? Math.max(1, Math.floor(Number(value))) : 80;
 }
 
+/**
+ * The terminal's current size, read at render time so a resize is honoured. Streams that aren't a
+ * terminal (tests, pipes) have no size: columns fall back to `fallback`, rows to Infinity (nothing
+ * to window).
+ */
+export function liveColumns(out: unknown, fallback: number): number {
+  const c = (out as { columns?: unknown } | null | undefined)?.columns;
+  return typeof c === 'number' && c > 0 ? Math.floor(c) : fallback;
+}
+export function liveRows(out: unknown): number {
+  const r = (out as { rows?: unknown } | null | undefined)?.rows;
+  return typeof r === 'number' && r > 0 ? Math.floor(r) : Infinity;
+}
+
 /** Presentation-only ASCII conversion; colour helpers never alter input text. @param {string} text */
 export function ascii(text: string) {
   return text.replace(/[◆◇━─│╭╮╰╯┌┐└┘├┤┬┴┼✔✖…·›●○⣾⣽⣻⢿⡿⣟⣯⣷]/gu, (char: string) => {

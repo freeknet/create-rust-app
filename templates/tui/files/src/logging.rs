@@ -26,7 +26,7 @@ use std::path::PathBuf;
 
 /// Where the log file goes.
 fn log_path() -> PathBuf {
-    std::env::temp_dir().join("@@name@@.log")
+    std::env::temp_dir().join(concat!(env!("CARGO_PKG_NAME"), ".log"))
 }
 
 /// Installs the file logger, unless one is already installed.

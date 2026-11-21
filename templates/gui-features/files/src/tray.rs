@@ -8,7 +8,7 @@
 
 //! The tray icon.
 //!
-//! On Windows the icon lives in [`crate::win::tray`]: a left click restores
+//! On Windows the icon lives in `crate::win::tray`: a left click restores
 //! and focuses the window, a right click offers Open and Exit, and Exit
 //! closes the window the way its own close button does, so the app still
 //! shuts down normally and saves its preferences. Elsewhere there is no

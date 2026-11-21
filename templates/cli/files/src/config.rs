@@ -47,7 +47,7 @@ pub struct Config {
 /// config directory (a stripped-down container, for one).
 #[must_use]
 pub fn config_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|dir| dir.join("@@name@@").join("config.toml"))
+    dirs::config_dir().map(|dir| dir.join(env!("CARGO_PKG_NAME")).join("config.toml"))
 }
 
 /// Loads the saved config, or the defaults if there is nothing readable.

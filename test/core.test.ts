@@ -98,6 +98,26 @@ test('template deps.js never pins a different version of a base crate', async ()
   }
 });
 
+test('an empty tagline is resolved once: Cargo.toml and README agree (B18)', async () => {
+  const { buildPlan } = await import('../src/engine/plan.ts');
+  for (const [preset, tagline] of [['cli', ''], ['strobe', ''], ['lib', '   ']] as const) {
+    const ctx = buildContext(resolveAnswers(preset, { name: 'tag-less', tagline }));
+    assert.equal(ctx.tagline, 'tag-less', `${preset}: ctx.tagline falls back to the name`);
+    assert.equal(ctx.tokens.tagline, 'tag-less', `${preset}: the token too`);
+    const plan = await buildPlan(ctx);
+    const text = (dest: string) => {
+      const e = plan.find((p) => p.dest === dest);
+      return e && 'content' in e ? e.content : '';
+    };
+    assert.match(text('README.md'), /^\*\*tag-less\*\*$/m, `${preset}: README bold line is the name, not ****`);
+    assert.doesNotMatch(text('README.md'), /^\*\*\*\*$/m);
+    const manifest = preset === 'strobe' ? 'crates/tag-less-app/Cargo.toml' : 'Cargo.toml';
+    assert.match(text(manifest), /^description = "tag-less"$/m, `${preset}: Cargo description is the name`);
+  }
+  const given = buildContext(resolveAnswers('cli', { name: 'x-y', tagline: 'Fast grep' }));
+  assert.equal(given.tokens.tagline, 'Fast grep', 'a real tagline is untouched');
+});
+
 test('GUI_ONLY_FEATURES covers every desktop feature label except the shared settings file', async () => {
   const { GUI_ONLY_FEATURES } = await import('../src/context.ts');
   const { DESKTOP } = await import('../src/ui/labels.ts');

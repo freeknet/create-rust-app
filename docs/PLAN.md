@@ -54,9 +54,11 @@ acid wording anywhere. The look is psychedelic rainbow, nerdy, slick.
   `windows` (clippy `--all-targets --all-features -- -D warnings`, test, `cargo build --release --bins`),
   `linux` (clippy + test; GUI projects also `cargo clippy … --target x86_64-pc-windows-msvc`).
   Actions pinned to full SHAs with version comments:
-  - `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1`
+  - `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1`, always with
+    `persist-credentials: false` (nothing pushes; `gh` reads `GH_TOKEN`)
   - `dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10` with `toolchain: "<pin>"`
-  - `Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3`
+  - `Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3` (CI only: the release
+    build restores no cache, so a poisoned entry cannot reach a shipped binary)
   - `EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1`
   - `actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2`
   - `actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2`
@@ -65,7 +67,7 @@ acid wording anywhere. The look is psychedelic rainbow, nerdy, slick.
 - Release (`release.yml`, on tag `v*` + `workflow_dispatch` input `tag`): job `draft`
   (contents: write; `gh release create "$TAG" --draft --title "<name> $TAG" --generate-notes`, reuse
   if exists) → `build` matrix `[{os: windows-latest, target: x86_64-pc-windows-msvc}]`
-  (build `--release --bins --target`, package `dist/<name>-<tag>-<target>/` with exe + README + LICENSE
+  (no build cache; build `--release --bins --target`, package `dist/<name>-<tag>-<target>/` with exe + README + LICENSE
   (+ themes.toml for GUI), `7z a -tzip`; SBOM via `cargo install cargo-cyclonedx --version 0.5.9 --locked
   && cargo cyclonedx --format json`; sha256; upload `release-assets-<target>`) → `publish`
   (contents/id-token/attestations: write; download `pattern: release-assets-*` `merge-multiple: true`;
@@ -228,10 +230,11 @@ all tooling), `tui` (ratatui + crossterm), `lib` (thiserror, no bin, docs.rs met
 ## 5. Verification
 
 1. `node --test`: directives, tokens (no `@@` left), cargo.js output, header module derivation,
-   preset snapshots.
+   per-preset rendered-plan checks. (Snapshot tests of generated trees are not written yet.)
 2. E2E: for each preset scaffold into a temp dir with `--yes --no-git --no-cargo-check`, then
    `cargo fmt --all -- --check`, `cargo clippy --all-targets --all-features -- -D warnings`,
    `cargo test --all-features`. Feature combos: gui + tray + singleInstance + commandPalette;
    cli + tokio + reqwest + sqlite; lib with `MIT OR Apache-2.0`.
 3. Manual: Windows Terminal, PowerShell 5, `NO_COLOR=1`, piped, `CI=1`, `--dry-run`, `--json`.
-4. `npm pack --dry-run` lists only `bin/ src/ templates/`.
+4. `npm pack --dry-run` lists only `dist/` and `templates/` (`package.json` `files`), plus the
+   `package.json`, `README.md` and `LICENSE` npm always adds; no `.ts` source ships.

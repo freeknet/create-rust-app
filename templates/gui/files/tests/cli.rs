@@ -3,7 +3,7 @@
 // Description:  The command line's two paths: a bare run opens the window,
 //               a subcommand runs a headless job.
 //
-// Dependencies: @@appCrateSnake@@::cli, clap, anyhow
+// Dependencies: the library crate's cli module, clap, anyhow
 // ============================================================================
 
 //! The command line's two paths.
@@ -14,9 +14,12 @@
 
 use @@appCrateSnake@@::cli::{Cli, Command};
 
+/// The program name the parser sees first.
+const BIN: &str = "@@bin@@";
+
 /// Parses `args` after a program name.
 fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
-    let argv = std::iter::once("@@bin@@").chain(args.iter().copied());
+    let argv = std::iter::once(BIN).chain(args.iter().copied());
     <Cli as clap::Parser>::try_parse_from(argv)
 }
 

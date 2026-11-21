@@ -175,7 +175,8 @@ mod tests {
 
     #[test]
     fn a_save_replaces_the_previous_file_and_leaves_no_temporary() -> anyhow::Result<()> {
-        let dir = std::env::temp_dir().join(format!("@@name@@-config-{}", std::process::id()));
+        let name = format!("{}-config-{}", crate::APP_ID, std::process::id());
+        let dir = std::env::temp_dir().join(name);
         let path = dir.join("config.toml");
         for theme in ["first", "second"] {
             let config = Config {
