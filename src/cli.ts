@@ -117,9 +117,9 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
     { title: 'cargo fetch', enabled: answers.post.fetch, run: cargoTask('cargo fetch', cargoFetch) },
     {
       title: 'git init', enabled: answers.post.git, run: async () => {
-        const r = initRepo(target, answers);
+        const r = initRepo(target, answers, plan.map((e) => e.dest));
         return r.ok === true
-          ? { ok: true, message: `Initialised git${g.sep}first commit on main` }
+          ? { ok: true, message: r.initialised ? `Initialised git${g.sep}first commit on ${r.branch}` : `First commit on ${r.branch} in the existing repository` }
           : { ok: r.ok, message: `git ${r.ok === false ? 'failed' : 'skipped'} ${dim(caps, `(${r.reason ?? ''})`)}` };
       },
     },
@@ -280,11 +280,15 @@ export async function main(argv: string[]) {
     }
     /** @type {boolean | undefined} */
     let gitDone: boolean | undefined;
+    // Whether "git init + first commit" in the summary below is what happened.
+    let gitInitialised = false;
     if (answers.post.git) {
-      const r = initRepo(target, answers);
+      const r = initRepo(target, answers, dests);
       gitDone = r.ok === true;
+      gitInitialised = r.ok === true && r.initialised === true;
       if (r.ok === false) log(`warning: ${r.reason}`);
       else if (r.ok === null) log(`git skipped: ${r.reason}`);
+      else if (!r.initialised) log(`git: first commit on ${r.branch} in the existing repository`);
     }
     /** @type {boolean | null} */
     let cargoChecked: boolean | null = null;
@@ -306,7 +310,8 @@ export async function main(argv: string[]) {
       // Same words as the interactive review, without prompts or a file dump (--dry-run lists files).
       const { reviewLines } = await import('./prompts.ts');
       const { dim } = await import('./ui/rainbow.ts');
-      const { title, body } = reviewLines(caps, answers);
+      // The summary reports what ran: no "git init" line when git was skipped or the repo existed.
+      const { title, body } = reviewLines(caps, { ...answers, post: { ...answers.post, git: gitInitialised } });
       const ok = (await import('./ui/glyphs.ts')).glyphs(caps).ok;
       const checks = [gitDone && 'git', cargoChecked === true && 'cargo check'].filter(Boolean).join(' · ');
       console.log(`\n${ok} ${title}  ${dim(caps, `${dests.length} files${checks ? ` · ${checks}` : ''}`)}\n`);
