@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough, Writable } from 'node:stream';
 import { spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { posix, win32 } from 'node:path';
 import { msrvProblem, promptVersionProblem, startOver, toolchainProblem, writesHint } from '../src/prompts.ts';
 import { validateRustVersions } from '../src/context.ts';
 import { width } from '../src/ui/tty.ts';
@@ -83,11 +83,15 @@ test('"Start over from a preset" wins over --kind and --preset, keeps the other 
 });
 
 test('the review hint names the folder the run writes, including a positional dir (B9)', () => {
-  const cwd = resolve('/work/projects');
-  assert.equal(writesHint(undefined, 'hp-cli', cwd), 'writes ./hp-cli');
-  assert.equal(writesHint('fl-dir', 'fl-renamed', cwd), 'writes ./fl-dir');
-  assert.equal(writesHint('.', 'here', cwd), 'writes .');
-  assert.equal(writesHint('../elsewhere', 'x', cwd), `writes ${resolve('/work/elsewhere')}`);
+  const cwd = '/work/projects';
+  assert.equal(writesHint(undefined, 'hp-cli', cwd, posix), 'writes ./hp-cli');
+  assert.equal(writesHint('fl-dir', 'fl-renamed', cwd, posix), 'writes ./fl-dir');
+  assert.equal(writesHint('.', 'here', cwd, posix), 'writes .');
+  assert.equal(writesHint('../elsewhere', 'x', cwd, posix), 'writes /work/elsewhere');
+  // Windows: / separators, and a drive-absolute path is not given a ./ prefix.
+  const wcwd = 'C:\\work\\projects';
+  assert.equal(writesHint('out\\fl-dir', 'x', wcwd, win32), 'writes ./out/fl-dir');
+  assert.equal(writesHint('..\\elsewhere', 'x', wcwd, win32), 'writes C:/work/elsewhere');
 });
 
 test('Licence + Rust prompts cross-check MSRV, toolchain and edition, worded for the prompt (B10)', () => {

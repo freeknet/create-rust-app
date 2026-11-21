@@ -12,7 +12,7 @@ import { NOTE_FRAME, NOTE_TITLE_FRAME, cancel, note, text } from './ui/rail.ts';
 import { glyphs } from './ui/glyphs.ts';
 import { PRESETS, resolveAnswers } from './presets.ts';
 import { shippedThemes } from './gen/themes.ts';
-import { isAbsolute } from 'node:path';
+import path from 'node:path';
 import { effectiveAnswers, validateBin, validateName, validateRustVersions } from './context.ts';
 import { shownTarget } from './reproduce.ts';
 import { dim, hex, bold } from './ui/rainbow.ts';
@@ -134,9 +134,9 @@ export function startOver(partial: PartialAnswers, preset: string, name: string)
 }
 
 /** The review's "Create it" hint: the folder the run really writes (the positional dir if given). */
-export function writesHint(dir: string | undefined, name: string, cwd?: string): string {
-  const shown = shownTarget(dir, name, cwd);
-  return `writes ${isAbsolute(shown) || shown === '.' ? shown : `./${shown}`}`;
+export function writesHint(dir: string | undefined, name: string, cwd?: string, p: typeof path = path): string {
+  const shown = shownTarget(dir, name, cwd, p);
+  return `writes ${p.isAbsolute(shown) || shown === '.' ? shown : `./${shown}`}`;
 }
 
 /**

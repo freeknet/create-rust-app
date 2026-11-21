@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- On Windows the target folder in the review hint, the `cd` line and the recreate command uses `/`
+  separators (`out/app`, `D:/proj/app`), so Git Bash no longer eats the backslashes and the
+  recreate command needs no quoting for them.
 - A workspace without the changelog generator no longer mentions `cargo xtask changelog` in
   `docs/decisions/D1.md`.
 - A workspace scaffolded `--without changelogGen` no longer ships `cargo xtask changelog`, which

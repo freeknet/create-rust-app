@@ -1,7 +1,7 @@
 /** The recreate command carries every answer that changes the output, and names the real folder. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
+import { posix, win32 } from 'node:path';
 import { parseArgv } from '../src/args.ts';
 import { resolveAnswers } from '../src/presets.ts';
 import { effectiveAnswers, reportedAnswers } from '../src/context.ts';
@@ -73,9 +73,24 @@ test('the recreate command names the real folder, and --name when it differs (B9
   assert.equal(reproduceCommand(raw, 'fl-dir'), `${RUN_COMMAND} fl-dir --name fl-renamed --preset cli -y`);
   assert.equal(reproduceCommand(raw, 'out/fl-renamed'), `${RUN_COMMAND} out/fl-renamed --preset cli -y`, 'no --name when the folder supplies it');
   assert.equal(reproduceCommand(raw), `${RUN_COMMAND} fl-renamed --preset cli -y`);
-  const cwd = join('/', 'work');
-  assert.equal(shownTarget('fl-dir', 'fl-renamed', cwd), 'fl-dir', 'the positional wins over the name');
-  assert.equal(shownTarget(undefined, 'fl-renamed', cwd), 'fl-renamed');
-  assert.equal(shownTarget('.', 'x', cwd), '.');
-  assert.equal(shownTarget('../elsewhere', 'x', cwd), join('/', 'elsewhere'), 'outside cwd: absolute');
+  // Each platform's path rules, explicitly, so both run on every OS.
+  const cwd = '/work';
+  assert.equal(shownTarget('fl-dir', 'fl-renamed', cwd, posix), 'fl-dir', 'the positional wins over the name');
+  assert.equal(shownTarget(undefined, 'fl-renamed', cwd, posix), 'fl-renamed');
+  assert.equal(shownTarget('.', 'x', cwd, posix), '.');
+  assert.equal(shownTarget('out/sub', 'x', cwd, posix), 'out/sub');
+  assert.equal(shownTarget('../elsewhere', 'x', cwd, posix), '/elsewhere', 'outside cwd: absolute');
+});
+
+test('on Windows the shown folder uses / so cd and the recreate command survive any shell (B9)', () => {
+  const cwd = 'C:\\work';
+  assert.equal(shownTarget('fl-dir', 'fl-renamed', cwd, win32), 'fl-dir');
+  assert.equal(shownTarget('.', 'x', cwd, win32), '.');
+  assert.equal(shownTarget('out\\sub', 'x', cwd, win32), 'out/sub', 'a backslash positional');
+  assert.equal(shownTarget('out/sub', 'x', cwd, win32), 'out/sub');
+  assert.equal(shownTarget('..\\elsewhere', 'x', cwd, win32), 'C:/elsewhere', 'outside cwd: absolute, drive kept');
+  assert.equal(shownTarget('D:\\proj\\app', 'x', cwd, win32), 'D:/proj/app', 'another drive');
+  // A /-separated folder needs no quoting, and its basename still supplies the name.
+  const raw = resolveAnswers('cli', { name: 'sub' });
+  assert.equal(reproduceCommand(raw, shownTarget('out\\sub', 'sub', cwd, win32)), `${RUN_COMMAND} out/sub --preset cli -y`);
 });

@@ -2,7 +2,7 @@
  * The command that recreates a set of answers without prompts, printed on the finish screen.
  * It lists only what differs from the chosen preset, so the common case stays one short line.
  */
-import { basename, isAbsolute, relative, resolve } from 'node:path';
+import path, { basename, resolve } from 'node:path';
 import { resolveAnswers } from './presets.ts';
 import { effectiveAnswers } from './context.ts';
 import type { Answers } from './types.ts';
@@ -20,11 +20,16 @@ const quote = (v: string) => (/^[\w.@/:+-]+$/.test(v) ? v : `"${v.replace(/["\\$
 /**
  * The target folder as the finish screen and the recreate command name it: `dir` (the positional)
  * or `./<name>`, relative to `cwd` when inside it, else absolute; `.` for `cwd` itself.
+ * Separators are always `/`: the result goes into `cd …` and the POSIX-quoted recreate command, and
+ * a Windows backslash would be eaten by Git Bash (`cd out\x` is `cd outx`) or doubled by the
+ * quoting, while `/` works in Git Bash, PowerShell, cmd and Node alike. `p` is `node:path` (or its
+ * `win32` / `posix` variant, so tests can exercise either platform).
  */
-export function shownTarget(dir: string | undefined, name: string, cwd: string = process.cwd()): string {
-  const target = resolve(cwd, dir ?? name);
-  const rel = relative(cwd, target);
-  return rel.startsWith('..') || isAbsolute(rel) ? target : rel || '.';
+export function shownTarget(dir: string | undefined, name: string, cwd: string = process.cwd(), p: typeof path = path): string {
+  const target = p.resolve(cwd, dir ?? name);
+  const rel = p.relative(cwd, target);
+  const shown = rel.startsWith('..') || p.isAbsolute(rel) ? target : rel || '.';
+  return p.sep === '\\' ? shown.replaceAll('\\', '/') : shown;
 }
 
 /**
