@@ -3,7 +3,7 @@
 // Description:  The command line's two paths: a bare run opens the window,
 //               a subcommand runs a headless job.
 //
-// Dependencies: @@appCrateSnake@@::cli, clap, anyhow
+// Dependencies: the library crate's cli module, clap, anyhow
 // ============================================================================
 
 //! The command line's two paths.

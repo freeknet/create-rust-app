@@ -3,7 +3,7 @@
 // Description:  Writes the mark's derived files: the multi-size .ico that
 //               build.rs embeds in the executable.
 //
-// Dependencies: @@appCrateSnake@@::brand (the geometry and the rasteriser); std only
+// Dependencies: the library crate's brand module (the geometry and the rasteriser); std only
 // ============================================================================
 
 //! `cargo run --example brand_assets`

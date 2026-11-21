@@ -3,7 +3,7 @@
 // Description:  Entry point: parses the command line, loads preferences, and
 //               hands off to the desktop front end.
 //
-// Dependencies: anyhow; @@appCrateSnake@@::{cli, gui}
+// Dependencies: anyhow; the library crate (cli, gui)
 // ============================================================================
 
 // No console window behind the GUI in a release build: Windows gives a

@@ -3,7 +3,7 @@
 // Description:  End-to-end checks of the command line, through the same
 //               entry point the binary calls.
 //
-// Dependencies: @@crate@@ (the library), anyhow
+// Dependencies: the library crate, anyhow
 // ============================================================================
 
 //! End-to-end checks of the command line.

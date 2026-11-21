@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`use <crate> as app;`) or a constant, so rustfmt's layout no longer depends on the name.
   GUI projects of 14+ characters, workspaces of 16+, used to fail. `test/name-length.test.ts`
   guards it.
+- Projects with long names pass their own header check: `Dependencies:` lines name "the library
+  crate" instead of its (up to 68-character) path, and the check no longer counts the `Module:`
+  line, whose value is the file's path, against the 100-column limit.
 - `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` passes on eframe GUI projects (a private and a
   redundant intra-doc link in `src/gui/run.rs`) and with `--with tray` off Windows (`src/tray.rs`
   linked the Windows-only `win::tray`).

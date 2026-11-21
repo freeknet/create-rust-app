@@ -64,10 +64,12 @@ for (const [preset, over] of COMBOS) {
         const b = text.split('\n');
         assert.equal(b.length, a.length, `${dest}: line count must not depend on the name`);
         b.forEach((line, i) => {
-          // rustfmt leaves comments (wrap_comments is off) and tool attributes such as
-          // `#[command(name = "…")]` as written.
+          // rustfmt leaves doc comments (wrap_comments is off) and tool attributes such as
+          // `#[command(name = "…")]` as written. Plain `//` lines stay in: the header check
+          // holds banner lines to 100 columns, except `Module:`, whose value is the path.
           const t = line.trimStart();
-          if (line === a[i] || t.startsWith('//') || t.startsWith('#[')) return;
+          if (line === a[i] || t.startsWith('#[') || t.startsWith('///') || t.startsWith('//!')) return;
+          if (t.startsWith('// Module:')) return;
           if (line.length > 100) problems.push(`${dest}:${i + 1} (${line.length} cols): ${line.trim()}`);
         });
       }
