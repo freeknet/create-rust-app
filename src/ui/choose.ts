@@ -200,7 +200,9 @@ export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]
   const c = chrome(caps);
   const out = o.io?.output ?? process.stdout;
   const grouped = o.options.some((i) => i.group);
-  const prefix = width(`${c.g.bar}  ${grouped ? '  ' : ''}${c.g.boxOn} `);
+  // Without colour the focused row can't be told apart by style, so a focus mark gets its own column.
+  const mark = caps.tier === 'none';
+  const prefix = width(`${c.g.bar}  ${mark ? `${c.g.focus} ` : ''}${grouped ? '  ' : ''}${c.g.boxOn} `);
   const groupColor = new Map<string, string>();
   for (const i of o.options) if (i.group && !groupColor.has(i.group)) groupColor.set(i.group, STOPS[(groupColor.size * 2 + 1) % STOPS.length] ?? CYAN);
   const anim = { t: 0 };
@@ -238,7 +240,8 @@ export function pickMany<V>(caps: Caps, o: { message: string; options: Item<V>[]
         if (on) focus = body.length;
         const box = selected.has(item.value) ? hex(caps, GREEN, c.g.boxOn) : dim(caps, c.g.boxOff);
         const label = on ? shimmer(caps, r.label, anim.t) : r.label;
-        body.push(`${c.live()}  ${grouped ? '  ' : ''}${box} ${label}${r.gap}${on ? r.hint : dim(caps, r.hint)}`);
+        const pointer = mark ? `${on ? c.g.focus : ' '.repeat(width(c.g.focus))} ` : '';
+        body.push(`${c.live()}  ${pointer}${grouped ? '  ' : ''}${box} ${label}${r.gap}${on ? r.hint : dim(caps, r.hint)}`);
       });
       const parts = ['space toggle', 'a all', 'enter confirm', escHint(o.back)];
       const footer = `${c.live(c.g.barEnd)}  ${dim(caps, fitFooter(caps, parts, [1, 2, 0], Math.max(1, columns - 4)))}`;

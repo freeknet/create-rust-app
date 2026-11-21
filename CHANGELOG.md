@@ -54,6 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - At 40 columns no option row, footer or prompt message wraps: descriptions shorten, then drop,
   then labels are cut with an ellipsis, and footers drop their least useful hints first. The
   terminal size is read on every frame, so a resize is honoured.
+- Without colour (`NO_COLOR`, `--no-color`) the focused multi-select row gets a `›` mark (`>` in
+  ASCII) and the text cursor shows as a caret glyph, where both used to be invisible.
+  `--no-color` now emits no colour escape codes at all: the text prompt's inverse-video cursor
+  ignored the flag.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing

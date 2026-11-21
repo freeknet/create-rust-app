@@ -14,7 +14,7 @@ import { stripVTControlCharacters } from 'node:util';
 import { isCancel } from '@clack/core';
 import { BACK, clipEllipsis, fitFooter, layout, pick, pickMany, windowBody, windowStart } from '../src/ui/choose.ts';
 import { glyphs } from '../src/ui/glyphs.ts';
-import { tasks, text } from '../src/ui/rail.ts';
+import { plainCursor, tasks, text } from '../src/ui/rail.ts';
 import type { Caps } from '../src/types.ts';
 
 const caps: Caps = { tier: 'truecolor', glyphs: 'full', unicode: true, tty: true, columns: 100, animate: false };
@@ -178,6 +178,50 @@ test('a tall multi-select in a 40×10 terminal: every frame fits, the focused ro
   assert.match(last, /Option number 13/, 'the focused (last) row is drawn');
   assert.match(last, /↑ \d+ more/);
   for (const l of drawn(h.read())) assert.ok(width(l) <= 40, `wider than 40 columns: ${JSON.stringify(l)}`);
+});
+
+test('without colour the text cursor is a glyph, not inverse video (B16, B17)', () => {
+  const full: Caps = { ...caps, tier: 'none' };
+  assert.equal(plainCursor(full, 'nc-flag', 7), 'nc-flag█');
+  assert.equal(plainCursor(full, 'nc-flag', 5), 'nc-fl▏ag');
+  assert.equal(plainCursor({ ...full, glyphs: 'ascii', unicode: false }, 'abc', 1), 'a|bc');
+  assert.equal(plainCursor({ ...full, glyphs: 'ascii', unicode: false }, 'abc', 3), 'abc_');
+});
+
+test('no colour: focused multi-select row is marked, and no frame has an SGR sequence (B16, B17)', async () => {
+  const none: Caps = { ...caps, tier: 'none' };
+  const sgr = /\x1b\[[0-9;]*m/;
+  const h = harness();
+  const many = pickMany(none, { message: 'Tooling', options: [...options, { value: 'c', label: 'Gamma', hint: 'third', group: 'g' }], initialValues: ['a'], io: h.io });
+  await sleep(30);
+  h.input.write('\x1b[B');
+  await sleep(30);
+  const frame = drawn(h.read());
+  h.input.write('\r');
+  await many;
+  assert.ok(frame.some((l) => /^│  › +◻ Beta/.test(l)), `focused row marked: ${frame.join(' / ')}`);
+  assert.ok(frame.some((l) => /^│ {6}◼ Alpha/.test(l)), 'other rows keep the column, unmarked');
+  assert.doesNotMatch(h.read(), sgr);
+
+  const t = harness();
+  const typed = text(none, { message: 'Project name', io: t.io });
+  await sleep(30);
+  t.input.write('nc-flag');
+  t.input.write('\x1b[D');
+  await sleep(30);
+  t.input.write('\x1b[D');
+  await sleep(30);
+  t.input.write('\r');
+  await typed;
+  assert.doesNotMatch(t.read(), sgr);
+  assert.match(stripVTControlCharacters(t.read()), /nc-fl▏ag/);
+
+  const p = harness();
+  const one = pick(none, { message: 'Pick', options, io: p.io });
+  await sleep(30);
+  p.input.write('\r');
+  await one;
+  assert.doesNotMatch(p.read(), sgr);
 });
 
 /** Run a script against src/ui/rail.ts in a child process (real signals, real exit codes, own stdout). */

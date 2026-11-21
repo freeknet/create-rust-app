@@ -27,6 +27,12 @@ export function rail(caps: Caps) {
   };
 }
 
+/** Text with a visible cursor and no escape codes: a caret before the cursor cell, a block at the end. */
+export function plainCursor(caps: Caps, value: string, cursor: number) {
+  const g = glyphs(caps);
+  return cursor >= value.length ? `${value}${g.cursor}` : `${value.slice(0, cursor)}${g.caret}${value.slice(cursor)}`;
+}
+
 /** Free-text prompt. Resolves to the value or the cancel symbol. */
 export function text(caps: Caps, o: {
   message: string; placeholder?: string; defaultValue?: string; initialValue?: string;
@@ -49,8 +55,10 @@ export function text(caps: Caps, o: {
       if (this.state === 'cancel') return o.back && seen.esc ? backFrame(caps, o.message) : `${head}${r.error(r.g.cancel)}  ${o.message}\n${r.bar()}`;
       // Only one line may change per animation tick (see motion.ts): here that's the marker, so the
       // cursor in front of the placeholder stays steady.
+      // clack's cursor is an inverse-video cell (and sees NO_COLOR but not --no-color): without
+      // colour draw a caret glyph instead, so the position stays visible with no escape codes.
       const input = this.userInput
-        ? this.userInputWithCursor
+        ? (caps.tier === 'none' ? plainCursor(caps, this.userInput, this.cursor) : this.userInputWithCursor)
         : `${hex(caps, COLORS.live, r.g.cursor)}${dim(caps, o.placeholder ?? '')}`;
       const err = this.state === 'error';
       const color = err ? COLORS.warn : COLORS.live;
