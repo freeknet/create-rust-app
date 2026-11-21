@@ -43,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on workspaces too). Both generators share the header, `Unreleased` entries carry no commit hash
   (released ones still do), and CLAUDE.md / CONTRIBUTING.md say the file is generated and name
   the command whenever the generator ships.
+- Generated docs: the README says a theme is eleven colours, as the themes do; CLAUDE.md and
+  CONTRIBUTING.md no longer claim a check enforces `assert!` messages, and list every place the
+  header check walks (`benches/`, `build.rs` too) with each module-name form; the GUI README lists
+  the Linux runtime libraries; CONTRIBUTING says attestation needs a public repository or GitHub
+  Enterprise Cloud; the release workflow's matrix comment says what else a new target needs.
 - This repo's CI pins `actions/setup-node` to a full commit SHA (v7.1.0) and checks out without
   persisting the token.
 

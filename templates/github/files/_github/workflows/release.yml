@@ -104,8 +104,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # The matrix stays a matrix so adding a target later is an entry
-          # rather than a rewrite.
+          # One target today, kept as a matrix so another can be added
+          # without restructuring the job. An entry alone is not enough:
+          # Package copies a hard-coded `.exe` and zips with `7z`, and the
+          # SBOM file name carries no target, so a second entry would
+          # collide with this one's at publish. Parameterise all three
+          # before adding a target.
           - os: windows-latest
             target: x86_64-pc-windows-msvc
     steps:

@@ -145,8 +145,11 @@ unlinted. A violation is a build failure.
 Denied in `[lints]` in `Cargo.toml`, so a violation is a build failure.
 <!-- @end -->
 Use `?`, `let ... else`, or an explicit fallback. Tests return
-`anyhow::Result<()>`, and every `assert!` carries a message. Release builds
-use `panic = "abort"`, so a panic is a crash, not an unwound error.
+`anyhow::Result<()>`. Release builds use `panic = "abort"`, so a panic is a
+crash, not an unwound error.
+
+By convention, not by any check, every `assert!` carries a message saying
+what failed: a bare `assertion failed` in CI tells nobody anything.
 
 The same block denies `wildcard_enum_match_arm` (name every variant: that
 is what catches a new variant silently doing nothing), `missing_docs`,
@@ -172,16 +175,21 @@ blank line, then the module's `//!` docs:
 //! The config file: every field optional, parsed independently.
 ```
 
-`src/header_check.rs` walks `src/`, `tests/` and `examples/` and fails the
-build for a file missing one, so a new file needs its header in the same
-commit that adds it. `Module:` is checked against the path the file sits at:
+`src/header_check.rs` walks `src/`, `tests/`, `examples/`, `benches/` and
+`build.rs` and fails the test run for a file missing one, so a new file
+needs its header in the same commit that adds it. `Module:` is checked
+against the path the file sits at:
 <!-- @if workspace -->
 `src/foo/mod.rs` is `@@appCrateSnake@@::foo`, `src/lib.rs` is
-`@@appCrate@@ (library crate root)`, and `tests/x.rs` is
-`x (integration test)`.
+`@@appCrate@@ (library crate root)`, `src/main.rs` is
+`@@appCrate@@ (binary crate root)`, `tests/x.rs` is `x (integration test)`,
+`examples/x.rs` is `x (example)`, `benches/x.rs` is `x (benchmark)`, and
+`build.rs` is `build (build script)`.
 <!-- @else -->
 `src/foo/mod.rs` is `foo`, `src/lib.rs` is `@@name@@ (library crate root)`,
-and `tests/x.rs` is `x (integration test)`.
+`src/main.rs` is `@@name@@ (binary crate root)`, `tests/x.rs` is
+`x (integration test)`, `examples/x.rs` is `x (example)`, `benches/x.rs` is
+`x (benchmark)`, and `build.rs` is `build (build script)`.
 <!-- @end -->
 Copy an existing header and fix all three fields. The banner is plain `//`,
 not `//!`; the reasoning belongs in the `//!` block below it.

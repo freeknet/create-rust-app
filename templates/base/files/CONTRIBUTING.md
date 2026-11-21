@@ -133,7 +133,8 @@ version:
 
 - **No `unwrap`, `expect`, `panic!`, `todo!` or `unreachable!`, including
   in tests.** Use `let ... else`, `?`, or an explicit fallback. Tests return
-  `anyhow::Result<()>`, and every `assert!` carries a message.
+  `anyhow::Result<()>`. (Every `assert!` also carries a message; that one
+  is a convention review keeps, not something the build checks.)
 - **`match` arms list every variant** (`wildcard_enum_match_arm` is denied),
   and suppressions are `#[expect(lint, reason = "...")]`, never `#[allow]`,
   so they cannot outlive what they suppressed.
@@ -142,9 +143,11 @@ version:
 <!-- @if headerCheck -->
 - **Every source file opens with a module header banner**: a ruled block
   naming `Module:`, `Description:` and `Dependencies:`, then the `//!` docs.
-  `src/header_check.rs` walks `src/`, `tests/` and `examples/` and fails the
-  build for a file missing one, checking `Module:` against the path the file
-  actually sits at.
+  `src/header_check.rs` walks `src/`, `tests/`, `examples/`, `benches/` and
+  `build.rs` and fails the build for a file missing one, checking `Module:`
+  against the path the file actually sits at (`tests/x.rs` is
+  `x (integration test)`, `examples/x.rs` is `x (example)`, `benches/x.rs`
+  is `x (benchmark)`, `build.rs` is `build (build script)`).
 <!-- @end -->
 <!-- @if unsafeCheck -->
 - **Every `unsafe` block is a safe leaf wrapper.** One named, private, safe
@@ -222,6 +225,11 @@ Fixed, and so on.
 4. The push triggers `.github/workflows/release.yml`: it checks the tag
    against `Cargo.toml`, builds the release archive with an SBOM and
    checksums, attests them, and publishes the GitHub release.
+   The attestation steps need a public repository, or a private one on
+   GitHub Enterprise Cloud: on the Free, Pro and Team plans GitHub offers
+   artifact attestations for public repositories only, so in a private
+   repository on those plans the attest steps fail and the release stays a
+   draft.
 <!-- @elif release & kind_lib -->
 4. Run `.github/workflows/publish.yml` from the tag
    (`gh workflow run publish.yml --ref v0.2.0`). It checks the tag against

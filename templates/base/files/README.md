@@ -88,6 +88,27 @@ right one automatically.
 <!-- @else -->
 Needs Rust @@msrv@@ or newer.
 <!-- @end -->
+<!-- @if has_gui -->
+
+### Linux runtime libraries
+
+Windows needs nothing extra. On Linux the window needs system libraries
+that a minimal install or a container may not have. On Debian or Ubuntu:
+
+- To build: `libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+  libxkbcommon-dev` (the list in eframe's README).
+- To run under X11 (including `xvfb`): `libxkbcommon-x11-0`.
+<!-- @if gui_eframe -->
+- A Vulkan driver, because wgpu renders through Vulkan on Linux:
+  `mesa-vulkan-drivers` (it includes a software renderer, so it also works
+  without a GPU).
+<!-- @else -->
+- An OpenGL driver, which the `egui_glow` renderer draws through (Mesa
+  provides one).
+<!-- @end -->
+
+Without them the app fails at startup, before the window opens.
+<!-- @end -->
 
 ## What's inside
 
@@ -134,7 +155,7 @@ Needs Rust @@msrv@@ or newer.
 <!-- @end -->
 <!-- @end -->
 <!-- @if themes -->
-- **Themes, or write your own.** A theme is thirteen colours in a TOML
+- **Themes, or write your own.** A theme is eleven colours in a TOML
   file; everything else is derived, and every theme is checked against WCAG
   contrast as a test.
 <!-- @end -->
