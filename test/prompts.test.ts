@@ -235,9 +235,14 @@ function child(body: string) {
   return spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 20000 });
 }
 
+// On Windows `process.kill(pid, 'SIGINT')` is TerminateProcess (exit status 1), never a catchable
+// signal; a real console Ctrl-C there still emits 'SIGINT', so emit the event the handler listens to.
+// Elsewhere a real signal is sent.
+const sendSigint = process.platform === 'win32' ? `process.emit('SIGINT', 'SIGINT')` : `process.kill(process.pid, 'SIGINT')`;
+
 test('Ctrl-C during the run steps restores the cursor, says what was left and exits 130 (B11)', () => {
   const r = child(`
-    setTimeout(() => process.kill(process.pid, 'SIGINT'), 100);
+    setTimeout(() => ${sendSigint}, 100);
     // A step that never finishes and keeps the process alive, like cargo fetch would.
     await tasks(caps, [{ title: 'cargo fetch', run: () => new Promise(() => { setInterval(() => {}, 1000); }) }],
       { interrupted: 'Interrupted. The partly created folder demo was left in place.' });`);
