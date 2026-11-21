@@ -110,7 +110,7 @@ create-rust-app [dir] [options]
 | `--no-cargo-check` | Skip `cargo check` even if a preset turns it on |
 | `--open <editor>` | Open the project in `code` or `cursor` when done |
 | `--dry-run` | Print the plan, write nothing |
-| `--json` | Machine-readable output |
+| `--json` | Machine-readable output: prints only `{ answers, files }` on stdout (notes go to stderr). Without `--dry-run` it still writes the files, but skips `cargo fetch`, git, `cargo check` and `--open`; `answers.post` shows what was asked, not what ran |
 | `--no-color` | Plain output (also honoured: `NO_COLOR`, non-TTY, `CI`) |
 | `--quiet` | Only errors |
 | `--force` | Write into a non-empty directory; lists the existing files it overwrote on stderr |

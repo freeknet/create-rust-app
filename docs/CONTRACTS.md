@@ -65,6 +65,12 @@ test/*.test.ts             node --test
   after flags, `--set` and preset defaults resolve (and again after the prompts); exit 2. `msrv` ≤
   `toolchain` (numeric compare) and `msrv` ≥ `EDITION_MIN_RUST[edition]` (2021: 1.56, 2024: 1.85).
 
+## `--json`
+
+Prints `{ answers: ReportedAnswers, files: string[] }` and nothing else on stdout; notes and errors
+go to stderr. Without `--dry-run` it writes the files but runs no post-step (fetch, git, cargo check,
+open); `answers.post` echoes the request, not what ran. Whether it should run them is undecided.
+
 ## Ctx = Answers + derived
 
 `buildContext(answers)` first applies `effectiveAnswers(answers)` (src/context.ts): options the kind

@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The "again without prompts" command recreates the same project: it carries `--accent`,
   `--author`, `--github`, display name and email, names the real target folder, and adds `--name`
   when the crate name differs from the folder's.
+- `--help`, the README and CONTRACTS say what `--json` does without `--dry-run`: it writes the
+  files but skips fetch, git, cargo check and `--open`.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing
