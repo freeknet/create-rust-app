@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line, whose value is the file's path, against the 100-column limit.
 - `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` passes on eframe GUI projects (a private and a
   redundant intra-doc link in `src/gui/run.rs`) and with `--with tray` off Windows (`src/tray.rs`
-  linked the Windows-only `win::tray`).
+  linked the Windows-only `win::tray`), and for a `cli` with SQLite (`src/db.rs` linked the private
+  `MIGRATIONS`).
 - Generated docs say what the project has: the `unsafe` boundary check names `src/win/` (plus
   `src/gui/run/` on winit-glow) instead of a `src/gui/run/` an eframe project doesn't have, and
   the app and shortcut docs mention the tray and command palette only when they are enabled.

@@ -17,7 +17,7 @@
 //! that records it in the `migrations` table, so a crash midway leaves the
 //! database at the previous version rather than half-upgraded, and
 //! reopening is always safe. To change the schema, add an entry to
-//! [`MIGRATIONS`]; never edit one that has shipped.
+//! `MIGRATIONS`; never edit one that has shipped.
 
 use anyhow::Context as _;
 
