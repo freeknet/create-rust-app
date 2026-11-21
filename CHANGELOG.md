@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`use <crate> as app;`) or a constant, so rustfmt's layout no longer depends on the name.
   GUI projects of 14+ characters, workspaces of 16+, used to fail. `test/name-length.test.ts`
   guards it.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` passes on eframe GUI projects (a private and a
+  redundant intra-doc link in `src/gui/run.rs`) and with `--with tray` off Windows (`src/tray.rs`
+  linked the Windows-only `win::tray`).
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing
   (`src/win/console.rs`). Opening the window never attaches, so closing the terminal doesn't close
