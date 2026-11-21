@@ -1,7 +1,7 @@
 # Dogfood report, November 2026
 
 Before: `db3693d`. After: `58847b6` plus this report. Branch `claude/jolly-curie-lpi8jt`,
-34 commits, no merges to `main`, no tags, no release, nothing published.
+35 commits plus four merge commits, nothing merged to `main`, no tags, no release, nothing published.
 
 The detailed findings are in [FINDINGS.md](FINDINGS.md). The agents' full reports are in
 [`evidence/`](evidence/); they cite raw logs under `logs/…`, which lived in a scratch
