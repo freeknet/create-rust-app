@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to the review, inside a section (or "Start over from a preset") it reopens the menu and drops
   only that section's edits. The footer there says `esc back`. Ctrl-C still quits everywhere,
   and Esc on the name, kind and review screens still cancels.
+- Ctrl-C during the run steps (writing, `cargo fetch`, `git init`, `cargo check`) shows the
+  cursor again, settles the spinner line and says the partly created folder was left in place,
+  then exits 130. The cursor used to stay hidden, with no message.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing

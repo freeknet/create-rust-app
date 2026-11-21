@@ -131,38 +131,57 @@ export interface Task { title: string; enabled?: boolean; required?: boolean; ru
  * Run tasks one after another. Each shows a spinner line while running and settles into
  * `◇  message  0.4s` (or a warning mark when it failed or was skipped). Returns false, without
  * running anything further, as soon as a `required` task fails.
+ *
+ * Ctrl-C while they run never reaches a `finally`, so a SIGINT handler is installed for the
+ * duration: it stops the spinner, shows the cursor again, settles the spinner line, prints
+ * `interrupted` (what was left behind) and exits 130.
  */
-export async function tasks(caps: Caps, list: Task[]) {
+export async function tasks(caps: Caps, list: Task[], o: { interrupted?: string } = {}) {
   const r = rail(caps);
-  for (const t of list) {
-    if (t.enabled === false) continue;
-    const t0 = performance.now();
-    let msg = t.title;
-    let frame = 0;
-    const draw = () => {
-      const spin = wave(caps, frame++);
-      const line = `${spin}  ${msg}`;
-      const max = Math.max(10, caps.columns - 1);
-      write(`\r\x1b[2K${width(line) > max ? `${line.slice(0, max - 1)}${r.g.ellipsis}` : line}`);
-    };
-    write(`${r.bar()}\n`);
-    const timer = caps.tty && caps.animate ? setInterval(draw, 90) : null;
-    if (caps.tty) { write('\x1b[?25l'); draw(); }
-    let result: { ok: boolean | null; message: string };
-    try {
-      result = await t.run((m) => { msg = `${t.title}  ${dim(caps, m)}`; });
-    } catch (e) {
-      result = { ok: false, message: `${t.title} failed: ${e instanceof Error ? e.message : String(e)}` };
-    } finally {
-      if (timer) clearInterval(timer);
-      if (caps.tty) write('\x1b[?25h');
+  let timer: ReturnType<typeof setInterval> | null = null;
+  let running = '';
+  const onSigint = () => {
+    if (timer) clearInterval(timer);
+    write(`${caps.tty ? '\r\x1b[2K\x1b[?25h' : ''}${r.error(r.g.cancel)}  ${running} ${dim(caps, '(interrupted)')}\n`);
+    cancel(caps, o.interrupted ?? 'Interrupted.');
+    process.exit(130);
+  };
+  process.on('SIGINT', onSigint);
+  try {
+    for (const t of list) {
+      if (t.enabled === false) continue;
+      const t0 = performance.now();
+      let msg = t.title;
+      let frame = 0;
+      running = t.title;
+      const draw = () => {
+        const spin = wave(caps, frame++);
+        const line = `${spin}  ${msg}`;
+        const max = Math.max(10, caps.columns - 1);
+        write(`\r\x1b[2K${width(line) > max ? `${line.slice(0, max - 1)}${r.g.ellipsis}` : line}`);
+      };
+      write(`${r.bar()}\n`);
+      timer = caps.tty && caps.animate ? setInterval(draw, 90) : null;
+      if (caps.tty) { write('\x1b[?25l'); draw(); }
+      let result: { ok: boolean | null; message: string };
+      try {
+        result = await t.run((m) => { msg = `${t.title}  ${dim(caps, m)}`; });
+      } catch (e) {
+        result = { ok: false, message: `${t.title} failed: ${e instanceof Error ? e.message : String(e)}` };
+      } finally {
+        if (timer) clearInterval(timer);
+        timer = null;
+        if (caps.tty) write('\x1b[?25h');
+      }
+      const secs = dim(caps, `${((performance.now() - t0) / 1000).toFixed(1)}s`);
+      const mark = result.ok === true ? r.done() : hex(caps, COLORS.warn, result.ok === null ? r.g.done : r.g.fail);
+      write(`${caps.tty ? '\r\x1b[2K' : ''}${mark}  ${result.message}  ${secs}\n`);
+      if (t.required && result.ok !== true) return false;
     }
-    const secs = dim(caps, `${((performance.now() - t0) / 1000).toFixed(1)}s`);
-    const mark = result.ok === true ? r.done() : hex(caps, COLORS.warn, result.ok === null ? r.g.done : r.g.fail);
-    write(`${caps.tty ? '\r\x1b[2K' : ''}${mark}  ${result.message}  ${secs}\n`);
-    if (t.required && result.ok !== true) return false;
+    return true;
+  } finally {
+    process.removeListener('SIGINT', onSigint);
   }
-  return true;
 }
 
 export { bold };

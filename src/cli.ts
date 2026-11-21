@@ -141,7 +141,7 @@ async function runInteractive({ caps, answers, plan, target, shown, force, overw
       },
     },
     { title: 'cargo check', enabled: answers.post.cargoCheck, run: cargoTask('cargo check', cargoCheck) },
-  ]);
+  ], { interrupted: `Interrupted. The partly created folder ${shown} was left in place.` });
   // After the task rail, so the list doesn't tear through its live lines.
   if (wrote && overwrites.length) notice(overwriteNotice(overwrites));
   if (!finished) {

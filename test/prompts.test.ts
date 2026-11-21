@@ -5,10 +5,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough, Writable } from 'node:stream';
+import { spawnSync } from 'node:child_process';
 import { stripVTControlCharacters } from 'node:util';
 import { isCancel } from '@clack/core';
 import { BACK, pick, pickMany } from '../src/ui/choose.ts';
-import { text } from '../src/ui/rail.ts';
+import { tasks, text } from '../src/ui/rail.ts';
 import type { Caps } from '../src/types.ts';
 
 const caps: Caps = { tier: 'truecolor', glyphs: 'full', unicode: true, tty: true, columns: 100, animate: false };
@@ -59,3 +60,32 @@ for (const [name, make] of Object.entries(prompts)) {
     assert.match(r.out, /esc cancel/);
   });
 }
+
+/** Run a script against src/ui/rail.ts in a child process (real signals, real exit codes, own stdout). */
+function child(body: string) {
+  const rail = new URL('../src/ui/rail.ts', import.meta.url).href;
+  const script = `import { tasks } from ${JSON.stringify(rail)};\nconst caps = ${JSON.stringify({ ...caps, tty: true })};\n${body}`;
+  return spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 20000 });
+}
+
+test('Ctrl-C during the run steps restores the cursor, says what was left and exits 130 (B11)', () => {
+  const r = child(`
+    setTimeout(() => process.kill(process.pid, 'SIGINT'), 100);
+    // A step that never finishes and keeps the process alive, like cargo fetch would.
+    await tasks(caps, [{ title: 'cargo fetch', run: () => new Promise(() => { setInterval(() => {}, 1000); }) }],
+      { interrupted: 'Interrupted. The partly created folder demo was left in place.' });`);
+  assert.equal(r.status, 130);
+  assert.ok(r.stdout.lastIndexOf('\x1b[?25h') > r.stdout.lastIndexOf('\x1b[?25l'), 'cursor shown again');
+  const plain = stripVTControlCharacters(r.stdout);
+  assert.match(plain, /cargo fetch \(interrupted\)/);
+  assert.match(plain, /The partly created folder demo was left in place\./);
+});
+
+test('the run steps remove their SIGINT handler when they finish', () => {
+  const r = child(`
+    const before = process.listenerCount('SIGINT');
+    await tasks(caps, [{ title: 'step', run: async () => ({ ok: true, message: 'done' }) }]);
+    console.log('listeners', before, process.listenerCount('SIGINT'));`);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /listeners 0 0/);
+});

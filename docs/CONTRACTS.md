@@ -217,6 +217,7 @@ pickMany(caps, { message, options: Item[], initialValues?, back?, io? }) → val
 text(caps, { message, placeholder?, defaultValue?, initialValue?, validate?, back?, io? }) → string | cancel symbol | BACK
 note(caps, title, body); box(caps, title, lines); log(caps, lines); outro(caps, msg); cancel(caps, msg)
 tasks(caps, Task[]) → Promise<boolean>  // false as soon as a `required` task fails; later tasks don't run
+// tasks(caps, list, { interrupted }): Ctrl-C restores the cursor, prints `interrupted`, exits 130
 // motion.ts: one animated line per prompt
 live(caps, prompt, state); marker(caps, glyph, t); shimmer(caps, text, t); wave(caps, frame)
 cascade(caps, lines); sparkle(caps, prefix, text)
