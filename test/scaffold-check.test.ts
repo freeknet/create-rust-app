@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import { cargoEnv, gateCommands, parseArgs, parseSet } from '../scripts/scaffold-check.ts';
 
@@ -40,7 +41,8 @@ test('scaffold-check gates: doc is opt-in, fmt builds nothing', () => {
 
 test('scaffold-check keeps an existing CARGO_TARGET_DIR', () => {
   assert.equal(cargoEnv({ CARGO_TARGET_DIR: '/shared/target' }, '/repo', 'full').CARGO_TARGET_DIR, '/shared/target');
-  assert.equal(cargoEnv({}, '/repo', 'full').CARGO_TARGET_DIR, '/repo/.scratch/target');
+  // The platform's own separators: cargo gets a native path (`\repo\.scratch\target` on Windows).
+  assert.equal(cargoEnv({}, '/repo', 'full').CARGO_TARGET_DIR, join('/repo', '.scratch', 'target'));
   assert.equal(cargoEnv({}, '/repo', 'doc').RUSTDOCFLAGS, '-D warnings');
   assert.equal(cargoEnv({ RUSTDOCFLAGS: '--cfg x' }, '/repo', 'doc').RUSTDOCFLAGS, '--cfg x -D warnings');
   assert.equal(cargoEnv({}, '/repo', 'full').RUSTDOCFLAGS, undefined);
