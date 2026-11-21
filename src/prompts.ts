@@ -13,7 +13,7 @@ import { glyphs } from './ui/glyphs.ts';
 import { PRESETS, resolveAnswers } from './presets.ts';
 import { shippedThemes } from './gen/themes.ts';
 import { isAbsolute } from 'node:path';
-import { effectiveAnswers, validateBin, validateName } from './context.ts';
+import { effectiveAnswers, validateBin, validateName, validateRustVersions } from './context.ts';
 import { shownTarget } from './reproduce.ts';
 import { dim, hex, bold } from './ui/rainbow.ts';
 import { BACK, pick, pickMany } from './ui/choose.ts';
@@ -137,6 +137,33 @@ export function startOver(partial: PartialAnswers, preset: string, name: string)
 export function writesHint(dir: string | undefined, name: string, cwd?: string): string {
   const shown = shownTarget(dir, name, cwd);
   return `writes ${isAbsolute(shown) || shown === '.' ? shown : `./${shown}`}`;
+}
+
+/**
+ * The MSRV / toolchain / edition cross-check (validateRustVersions, shared with the flags), with its
+ * advice worded for the Licence + Rust prompts rather than for `--msrv` / `--edition`. Trims first.
+ */
+export function promptVersionProblem(msrv: string, toolchain: string, edition: Answers['edition']): string | null {
+  const problem = validateRustVersions(msrv.trim(), toolchain.trim(), edition);
+  return problem
+    ?.replace('Raise --msrv or pick another --edition.', 'Raise the MSRV, or press esc and pick another edition.')
+    .replace('Lower --msrv or raise --toolchain.', 'Raise the toolchain, or press esc and lower the MSRV.') ?? null;
+}
+
+/** The MSRV prompt's check: shape, then the edition's minimum (the toolchain is asked next). */
+export function msrvProblem(v: string, edition: Answers['edition']): string | undefined {
+  const msrv = v.trim();
+  if (!/^\d+\.\d+(?:\.\d+)?$/.test(msrv)) return 'Use a version like 1.98';
+  // The toolchain is the next question, so here only the edition's minimum can fail: check the
+  // MSRV against itself as the toolchain.
+  return promptVersionProblem(msrv, msrv.split('.').length === 2 ? `${msrv}.0` : msrv, edition) ?? undefined;
+}
+
+/** The toolchain prompt's check: shape, then not older than the MSRV just given. */
+export function toolchainProblem(v: string, msrv: string, edition: Answers['edition']): string | undefined {
+  const toolchain = v.trim();
+  if (!/^\d+\.\d+\.\d+$/.test(toolchain)) return 'Use an exact version like 1.99.1';
+  return promptVersionProblem(msrv, toolchain, edition) ?? undefined;
 }
 
 /**
@@ -288,8 +315,8 @@ async function section(caps: Caps, a: Answers, which: string, targetCheck: (name
       message: 'Rust edition', initialValue: out.edition,
       options: ([{ value: '2024' as const, label: '2024', hint: 'current' }, { value: '2021' as const, label: '2021', hint: 'for older toolchains' }]),
     }));
-    out.msrv = sect(await text(caps, { back: true, message: 'Minimum supported Rust (rust-version)', initialValue: out.msrv, validate: (v) => (/^\d+\.\d+(?:\.\d+)?$/.test(v ?? '') ? undefined : 'Use a version like 1.98') }));
-    out.toolchain = sect(await text(caps, { back: true, message: 'Pinned toolchain (rust-toolchain.toml + CI)', initialValue: out.toolchain, validate: (v) => (/^\d+\.\d+\.\d+$/.test(v ?? '') ? undefined : 'Use an exact version like 1.99.1') }));
+    out.msrv = sect(await text(caps, { back: true, message: 'Minimum supported Rust (rust-version)', initialValue: out.msrv, validate: (v) => msrvProblem(v ?? '', out.edition) })).trim();
+    out.toolchain = sect(await text(caps, { back: true, message: 'Pinned toolchain (rust-toolchain.toml + CI)', initialValue: out.toolchain, validate: (v) => toolchainProblem(v ?? '', out.msrv, out.edition) })).trim();
   }
 
   if (which === 'after') {

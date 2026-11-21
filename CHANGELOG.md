@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it used to keep the flag's kind (`--kind lib`, start over as a desktop app: still a library).
 - With a positional folder, the review's "Create it" hint names that folder
   (`create-rust-app fl-dir`, renamed in Customize: `writes ./fl-dir`, not the new name).
+- The Licence + Rust prompts cross-check what you type, as the flags do: an MSRV older than the
+  edition allows, or a toolchain older than the MSRV, is refused inline with the reason; spaces
+  around a version are trimmed. A long message wraps on the rail instead of past the edge.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing

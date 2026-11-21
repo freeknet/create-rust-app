@@ -7,7 +7,7 @@
 import { TextPrompt } from '@clack/core';
 import { bold, dim, hex } from './rainbow.ts';
 import { glyphs } from './glyphs.ts';
-import { width } from './tty.ts';
+import { liveColumns, width, wrap } from './tty.ts';
 import { cascade, live, marker, sparkle, wave } from './motion.ts';
 import { backFrame, escHint, escWatch, settle } from './choose.ts';
 import type { Caps } from '../types.ts';
@@ -37,6 +37,7 @@ export function text(caps: Caps, o: {
 }) {
   const r = rail(caps);
   const anim = { t: 0 };
+  const out = o.io?.output ?? process.stdout;
   const prompt = new TextPrompt({
     ...(o.io ?? {}),
     ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
@@ -54,8 +55,12 @@ export function text(caps: Caps, o: {
       const err = this.state === 'error';
       const color = err ? COLORS.warn : COLORS.live;
       const step = err ? hex(caps, color, r.g.step) : marker(caps, r.g.step, anim.t);
-      const foot = err ? hex(caps, COLORS.warn, this.error) : dim(caps, `enter confirm · ${escHint(o.back)}`);
-      return `${head}${step}  ${o.message}\n${hex(caps, color, r.g.bar)}  ${input}\n${hex(caps, color, r.g.barEnd)}  ${foot}`;
+      // A long error wraps onto further rail lines instead of past the terminal's edge.
+      const foot = err
+        ? wrap(this.error, Math.max(10, liveColumns(out, caps.columns) - 4)).map((l) => hex(caps, COLORS.warn, l))
+        : [dim(caps, `enter confirm · ${escHint(o.back)}`)];
+      const tail = foot.map((l, i) => `${hex(caps, color, i === foot.length - 1 ? r.g.barEnd : r.g.bar)}  ${l}`).join('\n');
+      return `${head}${step}  ${o.message}\n${hex(caps, color, r.g.bar)}  ${input}\n${tail}`;
     },
   });
   const seen = escWatch(prompt);
