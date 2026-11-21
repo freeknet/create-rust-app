@@ -24,7 +24,9 @@ src/gen/header.ts          moduleFor(dest, ctx) → string               (CORE, 
 src/gen/index.ts           generate(ctx) → PlanEntry[]                 (Cargo.toml, deny.toml …)
 src/gen/cargo.ts, deps.ts, deny.ts
 src/post/{git,cargo,open}.ts
-src/reproduce.ts           reproduceCommand(answers, dir?) → string
+src/reproduce.ts           reproduceCommand(answers, dir?) → string; shownTarget(dir, name, cwd?) → string
+                           (dir = the real target as shownTarget prints it; adds --name when it differs
+                           from the folder's name; carries every answer that differs from the preset)
 src/ui/{tty,glyphs,rainbow,banner,theme,labels,choose,rail,motion,spinner}.ts
 templates/<group>/files/** template files; templates/<group>/manifest.js optional
 test/*.test.ts             node --test

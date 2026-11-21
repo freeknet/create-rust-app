@@ -2,7 +2,8 @@ import type { Answers, Caps } from './types.ts';
 type Node = Map<string, Node>;
 /** main(argv): args → answers → ctx → plan → write → post → summary. */
 import { readFile } from 'node:fs/promises';
-import { basename, resolve, relative } from 'node:path';
+import { basename, resolve } from 'node:path';
+import { shownTarget } from './reproduce.ts';
 import { parseArgv, optionalUi, renderHelp } from './args.ts';
 import { DEFAULTS, resolveAnswers } from './presets.ts';
 import { buildContext, effectiveAnswers, ignoredOptions, reportedAnswers, validateName, validateRustVersions } from './context.ts';
@@ -78,6 +79,12 @@ export function nextCommands(a: Answers, shown: string): [string, string][] {
   return out;
 }
 
+/** The crate name a positional folder supplies when no `--name` is given: its basename, if valid. */
+export function nameFromFolder(dir: string): string | null {
+  const base = basename(resolve(dir));
+  return validateName(base) ? null : base;
+}
+
 /** The one-line `--force` report: how many existing files were overwritten, and which. */
 export function overwriteNotice(files: string[], max = 20): string {
   const shown = files.slice(0, max).join(', ');
@@ -147,7 +154,7 @@ async function runInteractive({ caps, answers, plan, target, shown, force, overw
   const pad = Math.max(...cmds.map(([c]) => c.length)) + 3;
   // The notes are the first thing to go when the box would not fit the terminal.
   box(caps, 'next', cmds.map(([c, note]) => (note ? `${c.padEnd(pad)}${dim(caps, `# ${note}`)}` : c)), cmds.map(([c]) => c));
-  log(caps, [dim(caps, 'again without prompts:'), dim(caps, reproduceCommand(answers, shown === '.' ? '.' : undefined))]);
+  log(caps, [dim(caps, 'again without prompts:'), dim(caps, reproduceCommand(answers, shown))]);
   await outro(caps, 'build something luminous');
   return true;
 }
@@ -203,7 +210,8 @@ export async function main(argv: string[]) {
     // A positional dir with no --name supplies the name when it is a valid crate name.
     if (dir && overrides.name === undefined) {
       const base = basename(resolve(dir));
-      if (!validateName(base)) overrides.name = base;
+      const fromFolder = nameFromFolder(dir);
+      if (fromFolder) overrides.name = fromFolder;
       // Otherwise the default name applies; the prompt asks for one, a scripted run says so.
       else if (!interactive) notice(`the folder name "${base}" can't be a crate name, so the crate is named "${DEFAULTS.name}" (set it with --name).`);
     }
@@ -246,8 +254,8 @@ export async function main(argv: string[]) {
     const plan = await buildPlan(ctx);
     const dests = plan.map((e: PlanEntry) => e.dest);
     const target = resolve(dir ?? answers.name);
-    const rel = relative(process.cwd(), target);
-    const shown = rel.startsWith('..') ? target : rel || '.';
+    // The real target folder, as the finish screen and the recreate command name it (B9).
+    const shown = shownTarget(dir, answers.name);
     // Files --force is about to replace, reported once the write succeeds.
     const overwrites = flags.force && !flags['dry-run'] ? existingFiles(plan, target) : [];
     const reportOverwrites = () => { if (overwrites.length) notice(overwriteNotice(overwrites)); };

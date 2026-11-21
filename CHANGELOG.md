@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A write that fails midway no longer leaves a partial project: a folder the run created is
   removed, and in an existing folder only the files the run added are, with the error saying
   which. `--force` lists the existing files it overwrote on stderr.
+- The "again without prompts" command recreates the same project: it carries `--accent`,
+  `--author`, `--github`, display name and email, names the real target folder, and adds `--name`
+  when the crate name differs from the folder's.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing
