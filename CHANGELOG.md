@@ -49,6 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Licence + Rust prompts cross-check what you type, as the flags do: an MSRV older than the
   edition allows, or a toolchain older than the MSRV, is refused inline with the reason; spaces
   around a version are trimmed. A long message wraps on the rail instead of past the edge.
+- Lists taller than the terminal scroll: the window follows the focused row, with "↑ n more" /
+  "↓ n more" lines, and no stale frame lines are left in the scrollback after a choice.
+- At 40 columns no option row, footer or prompt message wraps: descriptions shorten, then drop,
+  then labels are cut with an ellipsis, and footers drop their least useful hints first. The
+  terminal size is read on every frame, so a resize is honoured.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing

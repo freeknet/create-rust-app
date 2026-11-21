@@ -12,7 +12,8 @@ import { validateRustVersions } from '../src/context.ts';
 import { width } from '../src/ui/tty.ts';
 import { stripVTControlCharacters } from 'node:util';
 import { isCancel } from '@clack/core';
-import { BACK, pick, pickMany } from '../src/ui/choose.ts';
+import { BACK, clipEllipsis, fitFooter, layout, pick, pickMany, windowBody, windowStart } from '../src/ui/choose.ts';
+import { glyphs } from '../src/ui/glyphs.ts';
 import { tasks, text } from '../src/ui/rail.ts';
 import type { Caps } from '../src/types.ts';
 
@@ -118,6 +119,65 @@ test('a long validation error wraps on the rail instead of past the edge', async
   const frames = drawn(h.read());
   assert.ok(frames.some((l) => l.includes('msrv 9.0 is newer')), 'the error is shown');
   for (const l of frames) assert.ok(width(l) <= 40, `wider than 40 columns: ${JSON.stringify(l)}`);
+});
+
+test('list window: scrolls as little as possible and keeps the focused row (and its header) visible (B14)', () => {
+  assert.equal(windowStart(20, 0, 0, 5, 0), 0);
+  assert.equal(windowStart(20, 4, 4, 5, 0), 0, 'still inside the window: no scroll');
+  assert.equal(windowStart(20, 5, 5, 5, 0), 1, 'one past the bottom scrolls by one');
+  assert.equal(windowStart(20, 19, 19, 5, 0), 15);
+  assert.equal(windowStart(20, 10, 10, 5, 12), 10, 'moving up past the top scrolls to the row');
+  assert.equal(windowStart(20, 9, 10, 5, 12), 9, 'a group header above the focused row comes along');
+  assert.equal(windowStart(20, 3, 3, 5, 99), 3, 'a stale start is clamped');
+  assert.equal(windowStart(3, 0, 2, 5, 0), 0, 'shorter than the room');
+});
+
+test('windowBody keeps the frame below the terminal height and says what is hidden', () => {
+  const body = Array.from({ length: 15 }, (_, i) => `row ${i}`);
+  const plainCaps: Caps = { ...caps, tier: 'none' };
+  const fits = windowBody(plainCaps, body, 0, 0, 40, 3, 0);
+  assert.deepEqual(fits.lines, body, 'no window when it fits');
+  const w = windowBody(plainCaps, body, 14, 14, 10, 3, 0);
+  assert.ok(w.lines.length + 3 <= 9, `frame of ${w.lines.length + 3} lines in a 10-row terminal`);
+  assert.match(w.lines[0] ?? '', /↑ \d+ more/);
+  assert.ok(w.lines.includes('row 14'), 'focused row visible');
+  assert.equal(w.lines.at(-1), '│', 'nothing below the last row');
+});
+
+test('rows, footers and messages fit 40 columns: hint first, then the label is cut (B15)', () => {
+  const items = [
+    { value: 'gui', label: 'Desktop app', tag: 'recommended', hint: 'egui + wgpu, themes, tray, palette, settings' },
+    { value: 'lib', label: 'Library', hint: 'a crate for other crates' },
+    { value: 'long', label: 'A label far too long to fit in forty columns at all', hint: 'x' },
+  ];
+  for (const glyphSet of ['full', 'ascii'] as const) {
+    const c: Caps = { ...caps, glyphs: glyphSet, unicode: glyphSet !== 'ascii' };
+    const prefix = width(`${glyphs(c).bar}  ${glyphs(c).radioOn} `);
+    for (const r of layout(c, items, 6, 40, prefix)) {
+      assert.ok(prefix + width(`${r.label}${r.tag}${r.gap}${r.hint}`) <= 39, `row too wide: ${r.label}${r.tag}${r.gap}${r.hint}`);
+    }
+  }
+  const wide = layout(caps, items.slice(0, 2), 6, 100, 5);
+  assert.equal(wide[0]?.hint, items[0]?.hint, 'a wide terminal keeps every description');
+  assert.equal(fitFooter(caps, ['space toggle', 'a all', 'enter confirm', 'esc back'], [1, 2, 0], 36), 'space toggle · esc back');
+  assert.equal(fitFooter(caps, ['↑↓ move', 'enter select', 'esc cancel'], [1, 0], 36), '↑↓ move · enter select · esc cancel');
+  assert.equal(clipEllipsis(caps, 'abcdefghij', 6), 'abcde…');
+});
+
+test('a tall multi-select in a 40×10 terminal: every frame fits, the focused row stays visible', async () => {
+  const h = harness();
+  Object.assign(h.io.output, { columns: 40, rows: 10 });
+  const opts = Array.from({ length: 14 }, (_, i) => ({ value: i, label: `Option number ${i}`, hint: 'a description that will not fit here', group: i < 7 ? 'first group' : 'second group' }));
+  const done = pickMany(caps, { message: 'Signature theme surfaces (your accent on these)', options: opts, back: true, io: h.io });
+  await sleep(30);
+  for (let i = 0; i < 13; i++) { h.input.write('\x1b[B'); await sleep(5); }
+  await sleep(30);
+  const last = drawn(h.read()).join('\n');
+  h.input.write('\r');
+  await done;
+  assert.match(last, /Option number 13/, 'the focused (last) row is drawn');
+  assert.match(last, /↑ \d+ more/);
+  for (const l of drawn(h.read())) assert.ok(width(l) <= 40, `wider than 40 columns: ${JSON.stringify(l)}`);
 });
 
 /** Run a script against src/ui/rail.ts in a child process (real signals, real exit codes, own stdout). */
