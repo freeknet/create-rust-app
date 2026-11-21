@@ -20,7 +20,7 @@ function rustStr(source: string, name: string): string {
 /** The subject the scaffold's first commit is made with, for `name`. */
 function firstSubject(name: string): string {
   const git = readFileSync(new URL('../src/post/git.ts', import.meta.url), 'utf8');
-  const match = /'-m', `([^`]*)`/.exec(git);
+  const match = /const message = `([^`]*)`/.exec(git);
   assert.ok(match?.[1] !== undefined, 'first commit message not found in src/post/git.ts');
   return match[1].replace('${answers.name}', name);
 }
