@@ -55,6 +55,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when the crate name differs from the folder's.
 - `--help`, the README and CONTRACTS say what `--json` does without `--dry-run`: it writes the
   files but skips fetch, git, cargo check and `--open`.
+- Esc inside Customize steps back instead of quitting the run: on the Customize menu it returns
+  to the review, inside a section (or "Start over from a preset") it reopens the menu and drops
+  only that section's edits. The footer there says `esc back`. Ctrl-C still quits everywhere,
+  and Esc on the name, kind and review screens still cancels.
+- Ctrl-C during the run steps (writing, `cargo fetch`, `git init`, `cargo check`) shows the
+  cursor again, settles the spinner line and says the partly created folder was left in place,
+  then exits 130. The cursor used to stay hidden, with no message.
+- "Start over from a preset" uses the preset you pick even when `--kind` or `--preset` was given;
+  it used to keep the flag's kind (`--kind lib`, start over as a desktop app: still a library).
+- With a positional folder, the review's "Create it" hint names that folder
+  (`create-rust-app fl-dir`, renamed in Customize: `writes ./fl-dir`, not the new name).
+- The Licence + Rust prompts cross-check what you type, as the flags do: an MSRV older than the
+  edition allows, or a toolchain older than the MSRV, is refused inline with the reason; spaces
+  around a version are trimmed. A long message wraps on the rail instead of past the edge.
+- Lists taller than the terminal scroll: the window follows the focused row, with "↑ n more" /
+  "↓ n more" lines, and no stale frame lines are left in the scrollback after a choice.
+- At 40 columns no option row, footer or prompt message wraps: descriptions shorten, then drop,
+  then labels are cut with an ellipsis, and footers drop their least useful hints first. The
+  terminal size is read on every frame, so a resize is honoured.
+- Without colour (`NO_COLOR`, `--no-color`) the focused multi-select row gets a `›` mark (`>` in
+  ASCII) and the text cursor shows as a caret glyph, where both used to be invisible.
+  `--no-color` now emits no colour escape codes at all: the text prompt's inverse-video cursor
+  ignored the flag.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing

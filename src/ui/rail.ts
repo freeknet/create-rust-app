@@ -7,8 +7,9 @@
 import { TextPrompt } from '@clack/core';
 import { bold, dim, hex } from './rainbow.ts';
 import { glyphs } from './glyphs.ts';
-import { width } from './tty.ts';
+import { liveColumns, width, wrap } from './tty.ts';
 import { cascade, live, marker, sparkle, wave } from './motion.ts';
+import { backFrame, escHint, escWatch, settle } from './choose.ts';
 import type { Caps } from '../types.ts';
 
 export const COLORS = { live: '#7cf7ff', done: '#b6ff6e', rail: '#6f6a85', warn: '#ffd36e', error: '#ff6b7c' };
@@ -26,14 +27,23 @@ export function rail(caps: Caps) {
   };
 }
 
+/** Text with a visible cursor and no escape codes: a caret before the cursor cell, a block at the end. */
+export function plainCursor(caps: Caps, value: string, cursor: number) {
+  const g = glyphs(caps);
+  return cursor >= value.length ? `${value}${g.cursor}` : `${value.slice(0, cursor)}${g.caret}${value.slice(cursor)}`;
+}
+
 /** Free-text prompt. Resolves to the value or the cancel symbol. */
 export function text(caps: Caps, o: {
   message: string; placeholder?: string; defaultValue?: string; initialValue?: string;
   validate?: (v: string) => string | undefined;
+  /** Esc resolves to BACK (choose.ts) instead of cancelling; Ctrl-C still cancels. */
+  back?: boolean;
   io?: import('./choose.ts').Io;
 }) {
   const r = rail(caps);
   const anim = { t: 0 };
+  const out = o.io?.output ?? process.stdout;
   const prompt = new TextPrompt({
     ...(o.io ?? {}),
     ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
@@ -42,21 +52,28 @@ export function text(caps: Caps, o: {
     render() {
       const head = `${r.bar()}\n`;
       if (this.state === 'submit') return `${head}${r.done()}  ${o.message}\n${r.bar()}  ${dim(caps, this.value ?? '')}`;
-      if (this.state === 'cancel') return `${head}${r.error(r.g.cancel)}  ${o.message}\n${r.bar()}`;
+      if (this.state === 'cancel') return o.back && seen.esc ? backFrame(caps, o.message) : `${head}${r.error(r.g.cancel)}  ${o.message}\n${r.bar()}`;
       // Only one line may change per animation tick (see motion.ts): here that's the marker, so the
       // cursor in front of the placeholder stays steady.
+      // clack's cursor is an inverse-video cell (and sees NO_COLOR but not --no-color): without
+      // colour draw a caret glyph instead, so the position stays visible with no escape codes.
       const input = this.userInput
-        ? this.userInputWithCursor
+        ? (caps.tier === 'none' ? plainCursor(caps, this.userInput, this.cursor) : this.userInputWithCursor)
         : `${hex(caps, COLORS.live, r.g.cursor)}${dim(caps, o.placeholder ?? '')}`;
       const err = this.state === 'error';
       const color = err ? COLORS.warn : COLORS.live;
       const step = err ? hex(caps, color, r.g.step) : marker(caps, r.g.step, anim.t);
-      const foot = err ? hex(caps, COLORS.warn, this.error) : dim(caps, 'enter confirm · esc cancel');
-      return `${head}${step}  ${o.message}\n${hex(caps, color, r.g.bar)}  ${input}\n${hex(caps, color, r.g.barEnd)}  ${foot}`;
+      // A long error wraps onto further rail lines instead of past the terminal's edge.
+      const foot = err
+        ? wrap(this.error, Math.max(10, liveColumns(out, caps.columns) - 4)).map((l) => hex(caps, COLORS.warn, l))
+        : [dim(caps, `enter confirm · ${escHint(o.back)}`)];
+      const tail = foot.map((l, i) => `${hex(caps, color, i === foot.length - 1 ? r.g.barEnd : r.g.bar)}  ${l}`).join('\n');
+      return `${head}${step}  ${o.message}\n${hex(caps, color, r.g.bar)}  ${input}\n${tail}`;
     },
   });
+  const seen = escWatch(prompt);
   live(caps, prompt, anim);
-  return prompt.prompt() as Promise<string | symbol>;
+  return settle(prompt.prompt() as Promise<string | symbol>, seen, o.back);
 }
 
 /**
@@ -127,38 +144,57 @@ export interface Task { title: string; enabled?: boolean; required?: boolean; ru
  * Run tasks one after another. Each shows a spinner line while running and settles into
  * `◇  message  0.4s` (or a warning mark when it failed or was skipped). Returns false, without
  * running anything further, as soon as a `required` task fails.
+ *
+ * Ctrl-C while they run never reaches a `finally`, so a SIGINT handler is installed for the
+ * duration: it stops the spinner, shows the cursor again, settles the spinner line, prints
+ * `interrupted` (what was left behind) and exits 130.
  */
-export async function tasks(caps: Caps, list: Task[]) {
+export async function tasks(caps: Caps, list: Task[], o: { interrupted?: string } = {}) {
   const r = rail(caps);
-  for (const t of list) {
-    if (t.enabled === false) continue;
-    const t0 = performance.now();
-    let msg = t.title;
-    let frame = 0;
-    const draw = () => {
-      const spin = wave(caps, frame++);
-      const line = `${spin}  ${msg}`;
-      const max = Math.max(10, caps.columns - 1);
-      write(`\r\x1b[2K${width(line) > max ? `${line.slice(0, max - 1)}${r.g.ellipsis}` : line}`);
-    };
-    write(`${r.bar()}\n`);
-    const timer = caps.tty && caps.animate ? setInterval(draw, 90) : null;
-    if (caps.tty) { write('\x1b[?25l'); draw(); }
-    let result: { ok: boolean | null; message: string };
-    try {
-      result = await t.run((m) => { msg = `${t.title}  ${dim(caps, m)}`; });
-    } catch (e) {
-      result = { ok: false, message: `${t.title} failed: ${e instanceof Error ? e.message : String(e)}` };
-    } finally {
-      if (timer) clearInterval(timer);
-      if (caps.tty) write('\x1b[?25h');
+  let timer: ReturnType<typeof setInterval> | null = null;
+  let running = '';
+  const onSigint = () => {
+    if (timer) clearInterval(timer);
+    write(`${caps.tty ? '\r\x1b[2K\x1b[?25h' : ''}${r.error(r.g.cancel)}  ${running} ${dim(caps, '(interrupted)')}\n`);
+    cancel(caps, o.interrupted ?? 'Interrupted.');
+    process.exit(130);
+  };
+  process.on('SIGINT', onSigint);
+  try {
+    for (const t of list) {
+      if (t.enabled === false) continue;
+      const t0 = performance.now();
+      let msg = t.title;
+      let frame = 0;
+      running = t.title;
+      const draw = () => {
+        const spin = wave(caps, frame++);
+        const line = `${spin}  ${msg}`;
+        const max = Math.max(10, caps.columns - 1);
+        write(`\r\x1b[2K${width(line) > max ? `${line.slice(0, max - 1)}${r.g.ellipsis}` : line}`);
+      };
+      write(`${r.bar()}\n`);
+      timer = caps.tty && caps.animate ? setInterval(draw, 90) : null;
+      if (caps.tty) { write('\x1b[?25l'); draw(); }
+      let result: { ok: boolean | null; message: string };
+      try {
+        result = await t.run((m) => { msg = `${t.title}  ${dim(caps, m)}`; });
+      } catch (e) {
+        result = { ok: false, message: `${t.title} failed: ${e instanceof Error ? e.message : String(e)}` };
+      } finally {
+        if (timer) clearInterval(timer);
+        timer = null;
+        if (caps.tty) write('\x1b[?25h');
+      }
+      const secs = dim(caps, `${((performance.now() - t0) / 1000).toFixed(1)}s`);
+      const mark = result.ok === true ? r.done() : hex(caps, COLORS.warn, result.ok === null ? r.g.done : r.g.fail);
+      write(`${caps.tty ? '\r\x1b[2K' : ''}${mark}  ${result.message}  ${secs}\n`);
+      if (t.required && result.ok !== true) return false;
     }
-    const secs = dim(caps, `${((performance.now() - t0) / 1000).toFixed(1)}s`);
-    const mark = result.ok === true ? r.done() : hex(caps, COLORS.warn, result.ok === null ? r.g.done : r.g.fail);
-    write(`${caps.tty ? '\r\x1b[2K' : ''}${mark}  ${result.message}  ${secs}\n`);
-    if (t.required && result.ok !== true) return false;
+    return true;
+  } finally {
+    process.removeListener('SIGINT', onSigint);
   }
-  return true;
 }
 
 export { bold };

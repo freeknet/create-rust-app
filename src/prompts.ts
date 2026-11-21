@@ -12,9 +12,11 @@ import { NOTE_FRAME, NOTE_TITLE_FRAME, cancel, note, text } from './ui/rail.ts';
 import { glyphs } from './ui/glyphs.ts';
 import { PRESETS, resolveAnswers } from './presets.ts';
 import { shippedThemes } from './gen/themes.ts';
-import { effectiveAnswers, validateBin, validateName } from './context.ts';
+import { isAbsolute } from 'node:path';
+import { effectiveAnswers, validateBin, validateName, validateRustVersions } from './context.ts';
+import { shownTarget } from './reproduce.ts';
 import { dim, hex, bold } from './ui/rainbow.ts';
-import { pick, pickMany } from './ui/choose.ts';
+import { BACK, pick, pickMany } from './ui/choose.ts';
 import type { Item } from './ui/choose.ts';
 import { STOPS } from './ui/theme.ts';
 import { clip, width, wrap } from './ui/tty.ts';
@@ -31,16 +33,25 @@ export class Cancelled extends Error {
 const RECOMMENDED = 'rustaman';
 const PRESET_ORDER = ['rustaman', 'strobe', 'cli', 'tui', 'lib', 'minimal'];
 
-/** Unwrap a prompt result, turning Ctrl-C / Esc into a clean cancel. */
 /** Terminal caps for the running flow (set by ask), so a cancel anywhere renders consistently. */
 let flowCaps: Caps | null = null;
 
+/** Unwrap a prompt result, turning Ctrl-C / Esc into a clean cancel. */
 function got<T>(value: T): Exclude<T, symbol> {
   if (isCancel(value) || typeof value === 'symbol') {
     if (flowCaps) cancel(flowCaps, 'Nothing written.');
     throw new Cancelled();
   }
   return value as Exclude<T, symbol>;
+}
+
+/** Esc inside Customize: leave the current section (or the preset re-pick) without keeping its edits. */
+class Back extends Error {}
+
+/** Unwrap a Customize prompt: Esc (BACK) steps back a level, Ctrl-C still cancels the run. */
+function sect<T>(value: T): Exclude<T, symbol> {
+  if (value === BACK) throw new Back();
+  return got(value);
 }
 
 /** Catalogue entries → choose.ts items (description as hint, catalogue group as header). */
@@ -111,8 +122,55 @@ export function reviewLines(caps: Caps, a: Answers): { title: string; body: stri
   return { title, body: [...top, ...rows].join('\n') };
 }
 
-/** Explicit command-line answers only; the preset's answers stay editable defaults. */
-export async function ask(partial: PartialAnswers, caps: Caps, targetCheck: (name: string) => string | null = () => null): Promise<Answers> {
+/**
+ * Answers after an explicit "Start over from a preset": the preset picked there wins over `--kind`
+ * and `--preset`; every other command-line answer still applies.
+ */
+export function startOver(partial: PartialAnswers, preset: string, name: string): Answers {
+  const rest: PartialAnswers = { ...partial };
+  delete rest.kind;
+  delete rest.preset;
+  return resolveAnswers(preset, { ...rest, name });
+}
+
+/** The review's "Create it" hint: the folder the run really writes (the positional dir if given). */
+export function writesHint(dir: string | undefined, name: string, cwd?: string): string {
+  const shown = shownTarget(dir, name, cwd);
+  return `writes ${isAbsolute(shown) || shown === '.' ? shown : `./${shown}`}`;
+}
+
+/**
+ * The MSRV / toolchain / edition cross-check (validateRustVersions, shared with the flags), with its
+ * advice worded for the Licence + Rust prompts rather than for `--msrv` / `--edition`. Trims first.
+ */
+export function promptVersionProblem(msrv: string, toolchain: string, edition: Answers['edition']): string | null {
+  const problem = validateRustVersions(msrv.trim(), toolchain.trim(), edition);
+  return problem
+    ?.replace('Raise --msrv or pick another --edition.', 'Raise the MSRV, or press esc and pick another edition.')
+    .replace('Lower --msrv or raise --toolchain.', 'Raise the toolchain, or press esc and lower the MSRV.') ?? null;
+}
+
+/** The MSRV prompt's check: shape, then the edition's minimum (the toolchain is asked next). */
+export function msrvProblem(v: string, edition: Answers['edition']): string | undefined {
+  const msrv = v.trim();
+  if (!/^\d+\.\d+(?:\.\d+)?$/.test(msrv)) return 'Use a version like 1.98';
+  // The toolchain is the next question, so here only the edition's minimum can fail: check the
+  // MSRV against itself as the toolchain.
+  return promptVersionProblem(msrv, msrv.split('.').length === 2 ? `${msrv}.0` : msrv, edition) ?? undefined;
+}
+
+/** The toolchain prompt's check: shape, then not older than the MSRV just given. */
+export function toolchainProblem(v: string, msrv: string, edition: Answers['edition']): string | undefined {
+  const toolchain = v.trim();
+  if (!/^\d+\.\d+\.\d+$/.test(toolchain)) return 'Use an exact version like 1.99.1';
+  return promptVersionProblem(msrv, toolchain, edition) ?? undefined;
+}
+
+/**
+ * Explicit command-line answers only; the preset's answers stay editable defaults. `dir` is the
+ * positional target folder, when one was given.
+ */
+export async function ask(partial: PartialAnswers, caps: Caps, targetCheck: (name: string) => string | null = () => null, dir?: string): Promise<Answers> {
   flowCaps = caps;
   const given = (path: string) => path.split('.').reduce<unknown>((o, k) =>
     o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined, partial) !== undefined;
@@ -126,9 +184,10 @@ export async function ask(partial: PartialAnswers, caps: Caps, targetCheck: (nam
   }));
 
   // ── 2. what are you building ─────────────────────────────────────────────
-  const pickPreset = async (initial: string) => got(await pick(caps, {
+  const pickPreset = async (initial: string, back = false) => (back ? sect : got)(await pick(caps, {
     message: 'What are you building?',
     initialValue: initial,
+    back,
     options: (PRESET_ORDER.map((id) => ({
       value: id, label: PRESETS[id]?.label ?? id, hint: PRESETS[id]?.hint ?? '',
       ...(id === RECOMMENDED ? { tag: 'recommended' } : {}),
@@ -146,7 +205,7 @@ export async function ask(partial: PartialAnswers, caps: Caps, targetCheck: (nam
       message: 'Ready?',
       initialValue: 'create',
       options: ([
-        { value: 'create', label: 'Create it', hint: `writes ./${a.name}` },
+        { value: 'create', label: 'Create it', hint: writesHint(dir, a.name) },
         { value: 'customize', label: 'Customize…', hint: 'crates, features, tooling, licence, Rust version' },
         { value: 'cancel', label: 'Cancel', hint: 'nothing is written' },
       ]),
@@ -154,15 +213,33 @@ export async function ask(partial: PartialAnswers, caps: Caps, targetCheck: (nam
     if (next === 'create') return a;
     if (next === 'cancel') got(Symbol.for('clack:cancel'));
     a = await customize(caps, a, targetCheck, async () => {
-      preset = await pickPreset(preset ?? RECOMMENDED);
-      return resolveAnswers(preset, { ...partial, name: a.name });
+      preset = await pickPreset(preset ?? RECOMMENDED, true);
+      return startOver(partial, preset, a.name);
     });
   }
 }
 
-/** One section at a time, then back to the review. */
+/**
+ * One section at a time, then back to the review. Esc on the menu returns to the review unchanged;
+ * Esc inside a section (or the preset re-pick) drops that section's edits and reopens the menu.
+ */
 async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => string | null, repick: () => Promise<Answers>): Promise<Answers> {
-  const sections: Item<string>[] = ([
+  for (;;) {
+    const which = await pick(caps, { message: 'Customize what?', options: menu(a), back: true });
+    if (which === BACK) return a;
+    const choice = got(which);
+    if (choice === 'back') return a;
+    try {
+      return choice === 'preset' ? await repick() : await section(caps, a, choice, targetCheck);
+    } catch (e) {
+      if (!(e instanceof Back)) throw e;
+    }
+  }
+}
+
+/** The Customize menu's rows for these answers. */
+function menu(a: Answers): Item<string>[] {
+  return [
     { value: 'crates', label: 'Crates', hint: 'logging, async, HTTP, serde, SQLite…' },
     ...(isGui(a) ? [{ value: 'app', label: 'App', hint: 'GUI runtime, theme base, tray, palette…' }] : []),
     { value: 'tooling', label: 'Tooling', hint: 'CI, releases, guardrails, docs' },
@@ -171,15 +248,16 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
     { value: 'details', label: a.kind === 'lib' ? 'Name + tagline' : 'Name, command + tagline', hint: `${a.name}${effectiveAnswers(a).bin ? ` (runs as ${a.bin})` : ''} — ${a.tagline}` },
     { value: 'preset', label: 'Start over from a preset', hint: 'resets everything else' },
     { value: 'back', label: 'Back to review', hint: '' },
-  ]);
-  const which = got(await pick(caps, { message: 'Customize what?', options: sections }));
-  const out: Answers = structuredClone(a);
+  ];
+}
 
-  if (which === 'preset') return repick();
+/** One Customize section on a copy of the answers; every prompt here offers Esc to go back. */
+async function section(caps: Caps, a: Answers, which: string, targetCheck: (name: string) => string | null): Promise<Answers> {
+  const out: Answers = structuredClone(a);
 
   if (which === 'crates') {
     const toggles = (Object.keys(CRATE_TOGGLES) as (keyof typeof CRATE_TOGGLES)[]).filter((k) => !(k === 'clap' && a.kind === 'lib'));
-    const picked = got(await pickMany(caps, {
+    const picked = sect(await pickMany(caps, { back: true,
       message: 'Crates',
       options: items(CRATE_TOGGLES, toggles),
       initialValues: toggles.filter((k) => out.crates[k]),
@@ -187,7 +265,7 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
     for (const k of toggles) out.crates[k] = picked.includes(k);
     if ((a.kind === 'cli' || isGui(a)) && out.crates.clap) {
       const gui = isGui(a);
-      out.features.subcommands = got(await pick(caps, {
+      out.features.subcommands = sect(await pick(caps, { back: true,
         message: 'Command line', initialValue: out.features.subcommands,
         options: ([
           gui
@@ -199,19 +277,19 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
         ]),
       }));
     }
-    out.crates.logging = got(await pick(caps, { message: 'Logging', initialValue: out.crates.logging, options: items(LOGGING, ['log', 'env_logger', 'tracing']) }));
-    out.crates.async = got(await pick(caps, { message: 'Async runtime', initialValue: out.crates.async, options: items(ASYNC, ['none', 'tokio']) }));
-    out.crates.http = got(await pick(caps, { message: 'HTTP client', initialValue: out.crates.http, options: items(HTTP, ['none', 'ureq', 'reqwest']) }));
+    out.crates.logging = sect(await pick(caps, { back: true, message: 'Logging', initialValue: out.crates.logging, options: items(LOGGING, ['log', 'env_logger', 'tracing']) }));
+    out.crates.async = sect(await pick(caps, { back: true, message: 'Async runtime', initialValue: out.crates.async, options: items(ASYNC, ['none', 'tokio']) }));
+    out.crates.http = sect(await pick(caps, { back: true, message: 'HTTP client', initialValue: out.crates.http, options: items(HTTP, ['none', 'ureq', 'reqwest']) }));
   }
 
   if (which === 'app') {
-    out.guiStack = got(await pick(caps, { message: 'GUI runtime', initialValue: out.guiStack, options: items(STACKS, ['eframe', 'winit-glow']) }));
-    out.themeBase = got(await pick(caps, {
+    out.guiStack = sect(await pick(caps, { back: true, message: 'GUI runtime', initialValue: out.guiStack, options: items(STACKS, ['eframe', 'winit-glow']) }));
+    out.themeBase = sect(await pick(caps, { back: true,
       message: 'Signature theme surfaces (your accent on these)', initialValue: out.themeBase,
       options: shippedThemes().map((t) => ({ value: t.id, label: t.name, hint: `${t.mode} · ${t.app} / ${t.panel}` })),
     }));
     const keys = Object.values(grouped(DESKTOP)).flat();
-    const picked = got(await pickMany(caps, {
+    const picked = sect(await pickMany(caps, { back: true,
       message: 'App features',
       options: items(FEATURES, keys, true),
       initialValues: keys.filter((k) => out.features[k]),
@@ -223,7 +301,7 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
     const groups = grouped(TOOLING);
     if (!isGui(a)) groups['guardrails'] = (groups['guardrails'] ?? []).filter((k) => k !== 'unsafeCheck');
     const keys = Object.values(groups).flat();
-    const picked = got(await pickMany(caps, {
+    const picked = sect(await pickMany(caps, { back: true,
       message: 'Tooling',
       options: items(TOOLING, keys, true),
       initialValues: keys.filter((k) => out.tooling[k]),
@@ -232,13 +310,13 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
   }
 
   if (which === 'rust') {
-    out.license = got(await pick(caps, { message: 'Licence', initialValue: out.license, options: items(LICENSES, ['MIT', 'MIT OR Apache-2.0', 'Apache-2.0', 'MIT+CommonsClause']) }));
-    out.edition = got(await pick(caps, {
+    out.license = sect(await pick(caps, { back: true, message: 'Licence', initialValue: out.license, options: items(LICENSES, ['MIT', 'MIT OR Apache-2.0', 'Apache-2.0', 'MIT+CommonsClause']) }));
+    out.edition = sect(await pick(caps, { back: true,
       message: 'Rust edition', initialValue: out.edition,
       options: ([{ value: '2024' as const, label: '2024', hint: 'current' }, { value: '2021' as const, label: '2021', hint: 'for older toolchains' }]),
     }));
-    out.msrv = got(await text(caps, { message: 'Minimum supported Rust (rust-version)', initialValue: out.msrv, validate: (v) => (/^\d+\.\d+(?:\.\d+)?$/.test(v ?? '') ? undefined : 'Use a version like 1.98') }));
-    out.toolchain = got(await text(caps, { message: 'Pinned toolchain (rust-toolchain.toml + CI)', initialValue: out.toolchain, validate: (v) => (/^\d+\.\d+\.\d+$/.test(v ?? '') ? undefined : 'Use an exact version like 1.99.1') }));
+    out.msrv = sect(await text(caps, { back: true, message: 'Minimum supported Rust (rust-version)', initialValue: out.msrv, validate: (v) => msrvProblem(v ?? '', out.edition) })).trim();
+    out.toolchain = sect(await text(caps, { back: true, message: 'Pinned toolchain (rust-toolchain.toml + CI)', initialValue: out.toolchain, validate: (v) => toolchainProblem(v ?? '', out.msrv, out.edition) })).trim();
   }
 
   if (which === 'after') {
@@ -247,7 +325,7 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
       { value: 'fetch', label: 'cargo fetch', hint: 'download crates now (seconds)' },
       { value: 'cargoCheck', label: 'cargo check', hint: 'compile once to prove it builds (minutes for GUI)' },
     ]);
-    const picked = got(await pickMany(caps, {
+    const picked = sect(await pickMany(caps, { back: true,
       message: 'After creating',
       options: steps,
       initialValues: (['git', 'fetch', 'cargoCheck'] as const).filter((k) => out.post[k]),
@@ -255,24 +333,24 @@ async function customize(caps: Caps, a: Answers, targetCheck: (name: string) => 
     out.post.git = picked.includes('git');
     out.post.fetch = picked.includes('fetch');
     out.post.cargoCheck = picked.includes('cargoCheck');
-    out.post.open = got(await pick(caps, {
+    out.post.open = sect(await pick(caps, { back: true,
       message: 'Open it in an editor?', initialValue: out.post.open,
       options: ([{ value: 'none' as const, label: 'No', hint: '' }, { value: 'code' as const, label: 'VS Code', hint: 'code' }, { value: 'cursor' as const, label: 'Cursor', hint: 'cursor' }]),
     }));
   }
 
   if (which === 'details') {
-    out.name = got(await text(caps, { message: 'Project name', initialValue: out.name, validate: (v) => validateName(v ?? '') ?? targetCheck(v ?? '') ?? undefined }));
+    out.name = sect(await text(caps, { back: true, message: 'Project name', initialValue: out.name, validate: (v) => validateName(v ?? '') ?? targetCheck(v ?? '') ?? undefined }));
     if (out.kind !== 'lib') {
       // The executable is named after its crate unless this differs; then a [[bin]] table names it.
       const crateBin = out.kind === 'workspace' ? `${out.name}-app` : out.name;
-      const bin = got(await text(caps, {
+      const bin = sect(await text(caps, { back: true,
         message: 'Command name (what users type)', initialValue: out.bin || crateBin, placeholder: crateBin,
         validate: (v) => (v ? validateBin(v) ?? undefined : undefined),
       }));
       out.bin = bin === crateBin ? '' : bin;
     }
-    out.tagline = got(await text(caps, { message: 'One-line description', initialValue: out.tagline, placeholder: 'A Rust app.' }));
+    out.tagline = sect(await text(caps, { back: true, message: 'One-line description', initialValue: out.tagline, placeholder: 'A Rust app.' }));
   }
   return out;
 }
