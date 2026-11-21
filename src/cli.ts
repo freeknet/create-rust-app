@@ -2,12 +2,13 @@ import type { Answers, Caps } from './types.ts';
 type Node = Map<string, Node>;
 /** main(argv): args → answers → ctx → plan → write → post → summary. */
 import { readFile } from 'node:fs/promises';
-import { basename, resolve, relative } from 'node:path';
+import { basename, resolve } from 'node:path';
+import { shownTarget } from './reproduce.ts';
 import { parseArgv, optionalUi, renderHelp } from './args.ts';
-import { resolveAnswers } from './presets.ts';
-import { buildContext, effectiveAnswers, validateName } from './context.ts';
+import { DEFAULTS, resolveAnswers } from './presets.ts';
+import { buildContext, effectiveAnswers, ignoredOptions, reportedAnswers, validateName, validateRustVersions } from './context.ts';
 import { buildPlan } from './engine/plan.ts';
-import { targetProblem, writePlan } from './engine/write.ts';
+import { existingFiles, targetProblem, writePlan } from './engine/write.ts';
 import { initRepo } from './post/git.ts';
 import { cargoCheck } from './post/cargo.ts';
 import { openEditor } from './post/open.ts';
@@ -78,9 +79,23 @@ export function nextCommands(a: Answers, shown: string): [string, string][] {
   return out;
 }
 
+/** The crate name a positional folder supplies when no `--name` is given: its basename, if valid. */
+export function nameFromFolder(dir: string): string | null {
+  const base = basename(resolve(dir));
+  return validateName(base) ? null : base;
+}
+
+/** The one-line `--force` report: how many existing files were overwritten, and which. */
+export function overwriteNotice(files: string[], max = 20): string {
+  const shown = files.slice(0, max).join(', ');
+  const more = files.length > max ? `, and ${files.length - max} more` : '';
+  return `--force overwrote ${files.length} existing file${files.length === 1 ? '' : 's'}: ${shown}${more}`;
+}
+
 /** Interactive run: ticked steps with timings, then the next-steps box and a sign-off. */
-async function runInteractive({ caps, answers, plan, target, shown, force }: {
+async function runInteractive({ caps, answers, plan, target, shown, force, overwrites, notice }: {
   caps: Caps; answers: Answers; plan: PlanEntry[]; target: string; shown: string; force: boolean;
+  overwrites: string[]; notice: (s: string) => void;
 }) {
   const { dim, paint } = await import('./ui/rainbow.ts');
   const { box, cancel, log, outro, tasks } = await import('./ui/rail.ts');
@@ -106,25 +121,29 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
       : { ok, message: ok ? `${label} done` : `${label} failed ${dim(caps, '(run it in the project for details)')}` };
   };
 
+  let wrote = false;
   const finished = await tasks(caps, [
     {
       title: `Writing ${plan.length} files`, required: true, run: async (update) => {
         await writePlan(plan, target, { force, onFile: (dest, i, n) => update(`${String(i).padStart(String(n).length)}/${n}  ${dest}`) });
-        return { ok: true, message: `Wrote ${plan.length} files to ${shown}` };
+        wrote = true;
+        return { ok: true, message: `Wrote ${plan.length} files to ${shown}${overwrites.length ? `${g.sep}overwrote ${overwrites.length}` : ''}` };
       },
     },
     // Fetch first: it writes Cargo.lock, which belongs in the first commit (#11).
     { title: 'cargo fetch', enabled: answers.post.fetch, run: cargoTask('cargo fetch', cargoFetch) },
     {
       title: 'git init', enabled: answers.post.git, run: async () => {
-        const r = initRepo(target, answers);
+        const r = initRepo(target, answers, plan.map((e) => e.dest));
         return r.ok === true
-          ? { ok: true, message: `Initialised git${g.sep}first commit on main` }
+          ? { ok: true, message: r.initialised ? `Initialised git${g.sep}first commit on ${r.branch}` : `First commit on ${r.branch} in the existing repository` }
           : { ok: r.ok, message: `git ${r.ok === false ? 'failed' : 'skipped'} ${dim(caps, `(${r.reason ?? ''})`)}` };
       },
     },
     { title: 'cargo check', enabled: answers.post.cargoCheck, run: cargoTask('cargo check', cargoCheck) },
   ]);
+  // After the task rail, so the list doesn't tear through its live lines.
+  if (wrote && overwrites.length) notice(overwriteNotice(overwrites));
   if (!finished) {
     cancel(caps, 'Stopped: nothing after the failed step ran.');
     return false;
@@ -135,7 +154,7 @@ async function runInteractive({ caps, answers, plan, target, shown, force }: {
   const pad = Math.max(...cmds.map(([c]) => c.length)) + 3;
   // The notes are the first thing to go when the box would not fit the terminal.
   box(caps, 'next', cmds.map(([c, note]) => (note ? `${c.padEnd(pad)}${dim(caps, `# ${note}`)}` : c)), cmds.map(([c]) => c));
-  log(caps, [dim(caps, 'again without prompts:'), dim(caps, reproduceCommand(answers, shown === '.' ? '.' : undefined))]);
+  log(caps, [dim(caps, 'again without prompts:'), dim(caps, reproduceCommand(answers, shown))]);
   await outro(caps, 'build something luminous');
   return true;
 }
@@ -185,12 +204,22 @@ export async function main(argv: string[]) {
     const interactive = !flags.yes && !json && Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY);
     /** @param {string} s */
     const log = (s: string) => { if (!quiet) console.log(s); };
+    // One-line notices go to stderr so --json stays pure; only --quiet silences them.
+    const notice = (s: string) => { if (!flags.quiet) console.error(`note: ${s}`); };
 
     // A positional dir with no --name supplies the name when it is a valid crate name.
     if (dir && overrides.name === undefined) {
       const base = basename(resolve(dir));
-      if (!validateName(base)) overrides.name = base;
+      const fromFolder = nameFromFolder(dir);
+      if (fromFolder) overrides.name = fromFolder;
+      // Otherwise the default name applies; the prompt asks for one, a scripted run says so.
+      else if (!interactive) notice(`the folder name "${base}" can't be a crate name, so the crate is named "${DEFAULTS.name}" (set it with --name).`);
     }
+
+    // Fail before asking anything on Rust versions the flags already contradict (exit 2).
+    const early = resolveAnswers(overrides.preset, overrides);
+    const earlyVersions = validateRustVersions(early.msrv, early.toolchain, early.edition);
+    if (earlyVersions) throw new Exit(2, earlyVersions);
 
     // Fail before asking anything: a folder we can't write into shouldn't cost the user a walkthrough.
     const writes = !flags['dry-run'] && !flags.force;
@@ -215,18 +244,29 @@ export async function main(argv: string[]) {
     } else {
       answers = resolveAnswers(overrides.preset, overrides);
     }
+    // Cross-field checks, after flags, --set and preset defaults have all applied.
+    const versionProblem = validateRustVersions(answers.msrv, answers.toolchain, answers.edition);
+    if (versionProblem) throw new Exit(2, versionProblem);
+    // Explicit options this kind never generates are dropped, not errors; a scripted run says so.
+    if (!interactive) for (const line of ignoredOptions(overrides, answers)) notice(line);
 
     const ctx = buildContext(answers);
     const plan = await buildPlan(ctx);
     const dests = plan.map((e: PlanEntry) => e.dest);
     const target = resolve(dir ?? answers.name);
-    const rel = relative(process.cwd(), target);
-    const shown = rel.startsWith('..') ? target : rel || '.';
+    // The real target folder, as the finish screen and the recreate command name it (B9).
+    const shown = shownTarget(dir, answers.name);
+    // Files --force is about to replace, reported once the write succeeds.
+    const overwrites = flags.force && !flags['dry-run'] ? existingFiles(plan, target) : [];
+    const reportOverwrites = () => { if (overwrites.length) notice(overwriteNotice(overwrites)); };
 
     if (json) {
-      if (!flags['dry-run']) await writePlan(plan, target, { force: Boolean(flags.force) });
-      // Report what was generated: options this kind never uses read false (#6).
-      console.log(JSON.stringify({ answers: effectiveAnswers(answers), files: dests }, null, 2));
+      if (!flags['dry-run']) {
+        await writePlan(plan, target, { force: Boolean(flags.force) });
+        reportOverwrites();
+      }
+      // Report what was generated: options this kind never uses read false (#6), and no GUI stack.
+      console.log(JSON.stringify({ answers: reportedAnswers(answers), files: dests }, null, 2));
       return 0;
     }
     if (flags['dry-run']) {
@@ -237,10 +277,11 @@ export async function main(argv: string[]) {
 
     if (interactive) {
       // The review screen already confirmed; this is the run + finish.
-      return (await runInteractive({ caps, answers, plan, target, shown, force: Boolean(flags.force) })) ? 0 : 1;
+      return (await runInteractive({ caps, answers, plan, target, shown, force: Boolean(flags.force), overwrites, notice })) ? 0 : 1;
     }
 
     await writePlan(plan, target, { force: Boolean(flags.force) });
+    reportOverwrites();
 
     // Post-steps.
     const spinMod = await optionalUi('spinner');
@@ -266,11 +307,15 @@ export async function main(argv: string[]) {
     }
     /** @type {boolean | undefined} */
     let gitDone: boolean | undefined;
+    // Whether "git init + first commit" in the summary below is what happened.
+    let gitInitialised = false;
     if (answers.post.git) {
-      const r = initRepo(target, answers);
+      const r = initRepo(target, answers, dests);
       gitDone = r.ok === true;
+      gitInitialised = r.ok === true && r.initialised === true;
       if (r.ok === false) log(`warning: ${r.reason}`);
       else if (r.ok === null) log(`git skipped: ${r.reason}`);
+      else if (!r.initialised) log(`git: first commit on ${r.branch} in the existing repository`);
     }
     /** @type {boolean | null} */
     let cargoChecked: boolean | null = null;
@@ -292,7 +337,8 @@ export async function main(argv: string[]) {
       // Same words as the interactive review, without prompts or a file dump (--dry-run lists files).
       const { reviewLines } = await import('./prompts.ts');
       const { dim } = await import('./ui/rainbow.ts');
-      const { title, body } = reviewLines(caps, answers);
+      // The summary reports what ran: no "git init" line when git was skipped or the repo existed.
+      const { title, body } = reviewLines(caps, { ...answers, post: { ...answers.post, git: gitInitialised } });
       const ok = (await import('./ui/glyphs.ts')).glyphs(caps).ok;
       const checks = [gitDone && 'git', cargoChecked === true && 'cargo check'].filter(Boolean).join(' · ');
       console.log(`\n${ok} ${title}  ${dim(caps, `${dests.length} files${checks ? ` · ${checks}` : ''}`)}\n`);

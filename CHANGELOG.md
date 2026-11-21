@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Project names that cannot build are refused up front, on the command line and in the name
+  prompt: Rust keywords from every edition (`fn`, `type`, `gen`, `try` …), Cargo-reserved names
+  (`build`, `deps` …), Windows device names (`con`, `nul` …), and names over 64 characters (the
+  crates.io limit, which `--bin` now shares). A long name used to die mid-write.
+- A target folder whose name can't be a crate name (`create-rust-app MyDir -y`) still gets the
+  default crate name, but a one-line note on stderr now says so and points at `--name`.
+- An MSRV newer than the pinned toolchain, or older than the edition allows (2024 needs 1.85),
+  is an argument error (exit 2), whether it came from `--msrv`, `--toolchain`, `--set` or a preset.
+  It used to scaffold a project cargo then refused to build.
+- Options the chosen kind ignores (`--preset lib --with tray`, `--preset lib --bin foo`,
+  `--preset cli --gui winit-glow`, `subcommands` on a TUI or without clap) each print a one-line
+  note on stderr instead of vanishing silently; `--quiet` hides them. `--json` reports `guiStack`
+  as `""` for kinds without a GUI, as it already did `themeBase`.
+- An empty tagline reads as the project name everywhere: the README's bold line used to come out
+  as `****` while `Cargo.toml` already fell back to the name.
+- Scaffolding into a folder that holds only a fresh `git init` makes the first commit there,
+  staging the generated files by path (anything else in the folder stays untracked). Inside some
+  other repository git is still skipped, and the finished summary no longer promises a commit.
+- A write that fails midway no longer leaves a partial project: a folder the run created is
+  removed, and in an existing folder only the files the run added are, with the error saying
+  which. `--force` lists the existing files it overwrote on stderr.
+- The "again without prompts" command recreates the same project: it carries `--accent`,
+  `--author`, `--github`, display name and email, names the real target folder, and adds `--name`
+  when the crate name differs from the folder's.
+- `--help`, the README and CONTRACTS say what `--json` does without `--dry-run`: it writes the
+  files but skips fetch, git, cargo check and `--open`.
+
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing
   (`src/win/console.rs`). Opening the window never attaches, so closing the terminal doesn't close

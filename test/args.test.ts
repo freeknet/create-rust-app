@@ -61,6 +61,15 @@ test('renderHelp: plain text lists flags and short names', async () => {
   }
 });
 
+test('renderHelp: --json says it writes files but skips the post-steps', async () => {
+  const help = await renderHelp({ tier: 'none', unicode: false, tty: false, columns: 80, animate: false });
+  const lines = help.split('\n');
+  const at = lines.findIndex((l) => l.trimStart().startsWith('--json'));
+  const text = lines.slice(at, at + 2).join(' ');
+  assert.match(text, /writes the\s+files unless --dry-run/);
+  assert.match(text, /skips fetch, git, cargo check and open/);
+});
+
 test('parseArgv: --bin takes a command name and refuses bad ones (#8)', () => {
   assert.equal(parseArgv(['--bin', 'ave']).overrides.bin, 'ave');
   assert.equal(parseArgv(['--bin', 'my_tool-2']).overrides.bin, 'my_tool-2', 'underscores and digits are fine');

@@ -36,6 +36,9 @@ export interface Answers {
   preset: string | null;
 }
 
+/** The answers `--json` reports: `guiStack` reads '' (like `themeBase`) for kinds without a GUI. */
+export type ReportedAnswers = Omit<Answers, 'guiStack'> & { guiStack: Answers['guiStack'] | '' };
+
 export type PartialAnswers = {
   [K in keyof Answers]?: Answers[K] extends object ? Partial<Answers[K]> : Answers[K];
 };
