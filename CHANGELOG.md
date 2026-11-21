@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Generated projects are `cargo fmt --check` clean for every project name from 1 to 64 characters:
+  lines that grew with the name (GUI `build.rs`, `main.rs`, `config.rs`, the screenshot and brand
+  examples, CLI `main.rs` and tests, the TUI log path) now name the crate through a short alias
+  (`use <crate> as app;`) or a constant, so rustfmt's layout no longer depends on the name.
+  GUI projects of 14+ characters, workspaces of 16+, used to fail. `test/name-length.test.ts`
+  guards it.
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing
   (`src/win/console.rs`). Opening the window never attaches, so closing the terminal doesn't close

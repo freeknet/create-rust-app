@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn a_second_claim_is_refused_until_the_first_is_released() {
-        let id = format!("@@name@@-test-{}", std::process::id());
+        let id = format!("{}-test-{}", crate::APP_ID, std::process::id());
         let first = acquire(&id);
         assert!(first.is_some(), "the first claim must succeed");
         assert!(acquire(&id).is_none(), "a second claim must be refused");

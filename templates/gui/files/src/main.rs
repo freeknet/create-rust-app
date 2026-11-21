@@ -36,6 +36,7 @@
 //! startup failure would look like the program refusing to open. See
 //! [`report`].
 
+use @@appCrateSnake@@ as app;
 use @@appCrateSnake@@::cli::Cli;
 
 fn main() -> std::process::ExitCode {
@@ -61,8 +62,8 @@ fn main() -> std::process::ExitCode {
     };
     // @else
     let cli = match Cli::parse_from(std::env::args().skip(1)) {
-        Ok(@@appCrateSnake@@::cli::Parsed::Run(cli)) => cli,
-        Ok(@@appCrateSnake@@::cli::Parsed::Print(text)) => {
+        Ok(app::cli::Parsed::Run(cli)) => cli,
+        Ok(app::cli::Parsed::Print(text)) => {
             borrow_console();
             println!("{text}");
             return std::process::ExitCode::SUCCESS;
@@ -89,10 +90,10 @@ fn main() -> std::process::ExitCode {
     // A second launch hands focus to the first window and leaves, rather
     // than opening a second copy that fights the first over the config file.
     #[cfg(windows)]
-    let _instance = match @@appCrateSnake@@::win::single_instance::acquire(@@appCrateSnake@@::APP_ID) {
+    let _instance = match app::win::single_instance::acquire(app::APP_ID) {
         Some(guard) => guard,
         None => {
-            @@appCrateSnake@@::win::single_instance::focus_existing(@@appCrateSnake@@::NAME);
+            app::win::single_instance::focus_existing(app::NAME);
             return std::process::ExitCode::SUCCESS;
         }
     };
@@ -113,13 +114,13 @@ fn main() -> std::process::ExitCode {
 /// to a console is closed with it and gets its Ctrl+C.
 fn borrow_console() {
     #[cfg(windows)]
-    @@appCrateSnake@@::win::console::attach_parent();
+    app::win::console::attach_parent();
 }
 
 // @if subcommands
 /// Runs a headless job. A failure goes to stderr only: the caller is a
 /// terminal or a script, not someone looking for a dialog.
-fn headless(command: @@appCrateSnake@@::cli::Command) -> std::process::ExitCode {
+fn headless(command: app::cli::Command) -> std::process::ExitCode {
     match command.run(&mut std::io::stdout().lock()) {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
@@ -134,9 +135,9 @@ fn headless(command: @@appCrateSnake@@::cli::Command) -> std::process::ExitCode 
 fn run(cli: Cli) -> anyhow::Result<()> {
     // @if config
     let mut config = if cli.reset {
-        @@appCrateSnake@@::config::Config::default()
+        app::config::Config::default()
     } else {
-        @@appCrateSnake@@::config::load()
+        app::config::load()
     };
     // @if themes
     if let Some(theme) = cli.theme {
@@ -146,7 +147,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
     if let Some(font) = cli.font {
         config.font = Some(font);
     }
-    @@appCrateSnake@@::gui::run::run(config)
+    app::gui::run::run(config)
     // @else
     // @if subcommands
     // main() has taken any subcommand; only the window is left to open.
@@ -154,7 +155,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
     // @else
     let Cli {} = cli;
     // @end
-    @@appCrateSnake@@::gui::run::run()
+    app::gui::run::run()
     // @end
 }
 
@@ -166,5 +167,5 @@ fn run(cli: Cli) -> anyhow::Result<()> {
 fn report(message: &str) {
     eprintln!("{message}");
     #[cfg(windows)]
-    @@appCrateSnake@@::win::dialog::show_error(message, @@appCrateSnake@@::NAME);
+    app::win::dialog::show_error(message, app::NAME);
 }
