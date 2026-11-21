@@ -240,7 +240,7 @@ export async function main(argv: string[]) {
     if (interactive) {
       const { ask } = await import('./prompts.ts');
       // With no directory given the target is ./<name>, so the name prompt checks that folder.
-      answers = await ask(overrides, caps, writes && !dir ? (name) => targetProblem(resolve(name)) : () => null);
+      answers = await ask(overrides, caps, writes && !dir ? (name) => targetProblem(resolve(name)) : () => null, dir);
     } else {
       answers = resolveAnswers(overrides.preset, overrides);
     }

@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ctrl-C during the run steps (writing, `cargo fetch`, `git init`, `cargo check`) shows the
   cursor again, settles the spinner line and says the partly created folder was left in place,
   then exits 130. The cursor used to stay hidden, with no message.
+- "Start over from a preset" uses the preset you pick even when `--kind` or `--preset` was given;
+  it used to keep the flag's kind (`--kind lib`, start over as a desktop app: still a library).
+- With a positional folder, the review's "Create it" hint names that folder
+  (`create-rust-app fl-dir`, renamed in Customize: `writes ./fl-dir`, not the new name).
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing

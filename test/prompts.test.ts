@@ -6,6 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough, Writable } from 'node:stream';
 import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
+import { startOver, writesHint } from '../src/prompts.ts';
 import { stripVTControlCharacters } from 'node:util';
 import { isCancel } from '@clack/core';
 import { BACK, pick, pickMany } from '../src/ui/choose.ts';
@@ -60,6 +62,27 @@ for (const [name, make] of Object.entries(prompts)) {
     assert.match(r.out, /esc cancel/);
   });
 }
+
+test('"Start over from a preset" wins over --kind and --preset, keeps the other flags (B12)', () => {
+  const lib = startOver({ kind: 'lib', name: 'fl-lib' }, 'rustaman', 'fl-lib');
+  assert.equal(lib.kind, 'gui');
+  assert.equal(lib.preset, 'rustaman');
+  assert.equal(lib.name, 'fl-lib');
+  const flagged = startOver({ preset: 'cli', kind: 'cli', edition: '2021', license: 'Apache-2.0' }, 'lib', 'renamed');
+  assert.equal(flagged.kind, 'lib');
+  assert.equal(flagged.preset, 'lib');
+  assert.equal(flagged.name, 'renamed');
+  assert.equal(flagged.edition, '2021', 'flags other than --kind / --preset still apply');
+  assert.equal(flagged.license, 'Apache-2.0');
+});
+
+test('the review hint names the folder the run writes, including a positional dir (B9)', () => {
+  const cwd = resolve('/work/projects');
+  assert.equal(writesHint(undefined, 'hp-cli', cwd), 'writes ./hp-cli');
+  assert.equal(writesHint('fl-dir', 'fl-renamed', cwd), 'writes ./fl-dir');
+  assert.equal(writesHint('.', 'here', cwd), 'writes .');
+  assert.equal(writesHint('../elsewhere', 'x', cwd), `writes ${resolve('/work/elsewhere')}`);
+});
 
 /** Run a script against src/ui/rail.ts in a child process (real signals, real exit codes, own stdout). */
 function child(body: string) {

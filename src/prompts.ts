@@ -12,7 +12,9 @@ import { NOTE_FRAME, NOTE_TITLE_FRAME, cancel, note, text } from './ui/rail.ts';
 import { glyphs } from './ui/glyphs.ts';
 import { PRESETS, resolveAnswers } from './presets.ts';
 import { shippedThemes } from './gen/themes.ts';
+import { isAbsolute } from 'node:path';
 import { effectiveAnswers, validateBin, validateName } from './context.ts';
+import { shownTarget } from './reproduce.ts';
 import { dim, hex, bold } from './ui/rainbow.ts';
 import { BACK, pick, pickMany } from './ui/choose.ts';
 import type { Item } from './ui/choose.ts';
@@ -120,8 +122,28 @@ export function reviewLines(caps: Caps, a: Answers): { title: string; body: stri
   return { title, body: [...top, ...rows].join('\n') };
 }
 
-/** Explicit command-line answers only; the preset's answers stay editable defaults. */
-export async function ask(partial: PartialAnswers, caps: Caps, targetCheck: (name: string) => string | null = () => null): Promise<Answers> {
+/**
+ * Answers after an explicit "Start over from a preset": the preset picked there wins over `--kind`
+ * and `--preset`; every other command-line answer still applies.
+ */
+export function startOver(partial: PartialAnswers, preset: string, name: string): Answers {
+  const rest: PartialAnswers = { ...partial };
+  delete rest.kind;
+  delete rest.preset;
+  return resolveAnswers(preset, { ...rest, name });
+}
+
+/** The review's "Create it" hint: the folder the run really writes (the positional dir if given). */
+export function writesHint(dir: string | undefined, name: string, cwd?: string): string {
+  const shown = shownTarget(dir, name, cwd);
+  return `writes ${isAbsolute(shown) || shown === '.' ? shown : `./${shown}`}`;
+}
+
+/**
+ * Explicit command-line answers only; the preset's answers stay editable defaults. `dir` is the
+ * positional target folder, when one was given.
+ */
+export async function ask(partial: PartialAnswers, caps: Caps, targetCheck: (name: string) => string | null = () => null, dir?: string): Promise<Answers> {
   flowCaps = caps;
   const given = (path: string) => path.split('.').reduce<unknown>((o, k) =>
     o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined, partial) !== undefined;
@@ -156,7 +178,7 @@ export async function ask(partial: PartialAnswers, caps: Caps, targetCheck: (nam
       message: 'Ready?',
       initialValue: 'create',
       options: ([
-        { value: 'create', label: 'Create it', hint: `writes ./${a.name}` },
+        { value: 'create', label: 'Create it', hint: writesHint(dir, a.name) },
         { value: 'customize', label: 'Customize…', hint: 'crates, features, tooling, licence, Rust version' },
         { value: 'cancel', label: 'Cancel', hint: 'nothing is written' },
       ]),
@@ -165,7 +187,7 @@ export async function ask(partial: PartialAnswers, caps: Caps, targetCheck: (nam
     if (next === 'cancel') got(Symbol.for('clack:cancel'));
     a = await customize(caps, a, targetCheck, async () => {
       preset = await pickPreset(preset ?? RECOMMENDED, true);
-      return resolveAnswers(preset, { ...partial, name: a.name });
+      return startOver(partial, preset, a.name);
     });
   }
 }

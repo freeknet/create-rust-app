@@ -12,7 +12,7 @@ bin/create-rust-app.ts     entry; imports src/cli.ts and calls main(process.argv
 src/cli.ts                 main(argv): args → answers → ctx → plan → write → post → summary
 src/args.ts                parseArgv(argv) → { dir, flags, overrides } (node:util parseArgs)
 src/presets.ts             PRESETS: Record<id, Partial<Answers>>; DEFAULTS: Answers
-src/prompts.ts             ask(partial, caps, targetCheck) → Answers   (@clack/core)
+src/prompts.ts             ask(partial, caps, targetCheck, dir?) → Answers   (@clack/core)
 src/context.ts             buildContext(answers) → Ctx                 (CORE, exists)
 src/engine/directives.ts   applyDirectives(text, flags) → text         (CORE, exists)
 src/engine/render.ts       renderText(text, ctx, dest) → text          (CORE, exists)
