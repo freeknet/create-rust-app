@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A workspace scaffolded `--without changelogGen` no longer ships `cargo xtask changelog`, which
+  would have rewritten the hand-edited CHANGELOG.md: the module, command and help text are gated.
+- Generated projects are `cargo fmt --check` clean for every project name from 1 to 64 characters:
+  lines that grew with the name (GUI `build.rs`, `main.rs`, `config.rs`, the screenshot and brand
+  examples, CLI `main.rs` and tests, the TUI log path) now name the crate through a short alias
+  (`use <crate> as app;`) or a constant, so rustfmt's layout no longer depends on the name.
+  GUI projects of 14+ characters, workspaces of 16+, used to fail. `test/name-length.test.ts`
+  guards it.
+- Projects with long names pass their own header check: `Dependencies:` lines name "the library
+  crate" instead of its (up to 68-character) path, and the check no longer counts the `Module:`
+  line, whose value is the file's path, against the 100-column limit.
+- `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` passes on eframe GUI projects (a private and a
+  redundant intra-doc link in `src/gui/run.rs`) and with `--with tray` off Windows (`src/tray.rs`
+  linked the Windows-only `win::tray`), and for a `cli` with SQLite (`src/db.rs` linked the private
+  `MIGRATIONS`).
+- Generated docs say what the project has: the `unsafe` boundary check names `src/win/` (plus
+  `src/gui/run/` on winit-glow) instead of a `src/gui/run/` an eframe project doesn't have, and
+  the app and shortcut docs mention the tray and command palette only when they are enabled.
 - Project names that cannot build are refused up front, on the command line and in the name
   prompt: Rust keywords from every edition (`fn`, `type`, `gen`, `try` …), Cargo-reserved names
   (`build`, `deps` …), Windows device names (`con`, `nul` …), and names over 64 characters (the
@@ -83,6 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- TUI projects build on ratatui 0.30 and crossterm 0.29 (were 0.29 and 0.28); the templates needed
+  no code changes, and the scaffold still builds on the 1.98 MSRV.
 - The classic Windows console gets 24-bit colour, block letters and a glyph set its font can draw,
   instead of an ASCII fallback.
 - Motion: shimmering focused option, cycling marker, wave spinner, live file and crate counters,
@@ -101,6 +121,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `scaffold-check` gains `--gate fmt` (rustfmt only, no build), `--gate doc` (`cargo doc --no-deps`
+  with `RUSTDOCFLAGS=-D warnings`, opt-in) and `--name <name>`; it splits `--set` on the first `=`
+  and keeps an existing `CARGO_TARGET_DIR`.
 - `--with subcommands` on desktop apps: `app <job>` runs a headless job (`themes`, `paths` to start
   with) and exits, a bare run opens the window as before, and `tests/cli.rs` covers both paths.
 - `--base <theme>`: lay the signature theme's accent on any shipped theme's surfaces, e.g.

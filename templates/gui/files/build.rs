@@ -25,9 +25,17 @@
 //! Release builds fail if the resources cannot be embedded: a distributable
 //! binary without its manifest is not a valid release.
 
+/// The project name: the icon and manifest under `assets/` are named after it.
+const NAME: &str = "@@name@@";
+
+/// The product name Explorer, Task Manager and the Properties dialog show.
+const PRODUCT: &str = "@@displayName@@";
+
 fn main() {
-    println!("cargo:rerun-if-changed=assets/@@name@@.ico");
-    println!("cargo:rerun-if-changed=assets/@@name@@.manifest");
+    let icon = format!("assets/{NAME}.ico");
+    let manifest = format!("assets/{NAME}.manifest");
+    println!("cargo:rerun-if-changed={icon}");
+    println!("cargo:rerun-if-changed={manifest}");
     println!("cargo:rerun-if-changed=build.rs");
 
     // The *target*, not the host: `cfg(windows)` in a build script describes
@@ -36,12 +44,12 @@ fn main() {
         return;
     }
     let mut resource = winresource::WindowsResource::new();
-    resource.set_icon("assets/@@name@@.ico");
-    resource.set_manifest_file("assets/@@name@@.manifest");
+    resource.set_icon(&icon);
+    resource.set_manifest_file(&manifest);
     // `FileDescription` is what Task Manager and Explorer show as the
     // program's name, so it holds the product name, not a sentence.
-    resource.set("ProductName", "@@displayName@@");
-    resource.set("FileDescription", "@@displayName@@");
+    resource.set("ProductName", PRODUCT);
+    resource.set("FileDescription", PRODUCT);
     resource.set("Comments", env!("CARGO_PKG_DESCRIPTION"));
     resource.set("LegalCopyright", "Copyright (c) @@year@@ @@author@@");
 

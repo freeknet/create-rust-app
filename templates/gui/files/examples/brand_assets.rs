@@ -3,7 +3,7 @@
 // Description:  Writes the mark's derived files: the multi-size .ico that
 //               build.rs embeds in the executable.
 //
-// Dependencies: @@appCrateSnake@@::brand (the geometry and the rasteriser); std only
+// Dependencies: the library crate's brand module (the geometry and the rasteriser); std only
 // ============================================================================
 
 //! `cargo run --example brand_assets`
@@ -18,6 +18,8 @@
 
 use std::path::Path;
 
+use @@appCrateSnake@@::brand;
+
 /// The sizes Windows picks from: title bar, taskbar, Explorer, Alt-Tab.
 const SIZES: [u32; 5] = [16, 24, 32, 48, 64];
 
@@ -27,7 +29,7 @@ fn main() -> anyhow::Result<()> {
         .join("@@name@@.ico");
     let images: Vec<(u32, Vec<u8>)> = SIZES
         .iter()
-        .map(|&edge| (edge, @@appCrateSnake@@::brand::rasterise(edge)))
+        .map(|&edge| (edge, brand::rasterise(edge)))
         .collect();
     std::fs::write(&out, ico(&images)?)?;
     println!("wrote {}", out.display());

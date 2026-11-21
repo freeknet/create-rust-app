@@ -139,7 +139,9 @@ test('--bin names the executable everywhere it is named, and only there (#8)', a
   assert.match(text(cli, 'src/cli.rs'), /#\[command\(name = "ln"/, 'clap shows the command name');
   assert.match(text(cli, 'README.md'), /puts `ln` on your PATH/, 'README');
   assert.match(text(cli, '.github/workflows/release.yml'), /release\/ln\.exe/, 'release packages the right exe');
-  assert.match(text(cli, 'src/config.rs'), /join\("long-name"\)/, 'the config dir stays the app name');
+  // The config dir is the package name (`long-name`), read at compile time, not the binary's.
+  assert.match(text(cli, 'src/config.rs'), /join\(env!\("CARGO_PKG_NAME"\)\)/, 'the config dir stays the app name');
+  assert.doesNotMatch(text(cli, 'src/config.rs'), /join\("ln"\)/, 'not the binary name');
 
   const ws = await plan('strobe', { bin: 'ln' });
   assert.match(text(ws, 'crates/long-name-app/Cargo.toml'), /\[\[bin\]\]\nname = "ln"/, 'workspace app crate gets [[bin]]');

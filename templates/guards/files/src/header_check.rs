@@ -51,7 +51,9 @@ mod tests {
     const REQUIRED: [&str; 3] = ["Module", "Description", "Dependencies"];
 
     /// rustfmt's default `max_width`. A header that runs past it wraps in
-    /// an editor and stops lining up, which is the whole point of it.
+    /// an editor and stops lining up, which is the whole point of it. The
+    /// `Module:` line is exempt: its value is the file's path, which a long
+    /// crate name can push past the limit and nothing in the file can shorten.
     const MAX_WIDTH: usize = 100;
 
     /// Every `.rs` file under `root`, found iteratively.
@@ -175,7 +177,7 @@ mod tests {
                     "{relative}: non-comment line inside header: {line}"
                 ));
             }
-            if line.chars().count() > MAX_WIDTH {
+            if line.chars().count() > MAX_WIDTH && !line.starts_with("// Module:") {
                 found.push(format!(
                     "{relative}: header line exceeds {MAX_WIDTH} columns"
                 ));
@@ -398,6 +400,27 @@ mod tests {
         let found = problems("src/color.rs", &text);
         assert!(
             found.iter().any(|problem| problem.contains("columns")),
+            "got {found:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_long_module_line_is_not_a_width_problem() -> Result<()> {
+        // The Module value is the file's path; a long crate name can push it
+        // past the width, and nothing in the file could shorten it.
+        let long = "x".repeat(MAX_WIDTH);
+        let text = format!(
+            "{RULE}\n\
+             // Module:       {long}::color\n\
+             // Description:  Colour maths.\n\
+             //\n\
+             // Dependencies: None.\n\
+             {RULE}\n"
+        );
+        let found = problems("src/color.rs", &text);
+        assert!(
+            !found.iter().any(|problem| problem.contains("columns")),
             "got {found:?}"
         );
         Ok(())

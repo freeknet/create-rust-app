@@ -19,8 +19,19 @@
 //! 3. on a normal quit, calls [`App::on_exit`].
 //!
 //! Every change of state a user can cause goes through [`Action`] and
+// @if tray & commandPalette
 //! [`App::apply`], so a shortcut, a button, the tray menu and the command
 //! palette cannot drift apart in what "open settings" means.
+// @elif tray
+//! [`App::apply`], so a shortcut, a button and the tray menu cannot drift
+//! apart in what "open settings" means.
+// @elif commandPalette
+//! [`App::apply`], so a shortcut, a button and the command palette cannot
+//! drift apart in what "open settings" means.
+// @else
+//! [`App::apply`], so a shortcut and a button cannot drift apart in what
+//! "open settings" means.
+// @end
 
 use crate::gui::ui::{self, glyph};
 use crate::theme::Palette;
