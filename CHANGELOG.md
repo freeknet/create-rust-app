@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A workspace scaffolded `--without changelogGen` no longer ships `cargo xtask changelog`, which
+  would have rewritten the hand-edited CHANGELOG.md: the module, command and help text are gated.
 - Generated projects are `cargo fmt --check` clean for every project name from 1 to 64 characters:
   lines that grew with the name (GUI `build.rs`, `main.rs`, `config.rs`, the screenshot and brand
   examples, CLI `main.rs` and tests, the TUI log path) now name the crate through a short alias
