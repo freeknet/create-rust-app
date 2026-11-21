@@ -59,6 +59,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   committed what was there, printed success and exited 0. Occupied folders are now refused before
   any question (unless `--force`), and a failed write stops the run with exit code 1.
 - Animated prompts no longer flicker.
+- Generated workflows check out with `persist-credentials: false`, so the job token is not left
+  in `.git/config` for build scripts to read (zizmor `artipacked`). No step needed it: `gh`
+  authenticates with `GH_TOKEN`.
+- The generated release build no longer restores `Swatinem/rust-cache`: the Actions cache is
+  writable from any branch's CI, so a tagged build could have shipped a poisoned entry (zizmor
+  `cache-poisoning`, high).
+- A fresh project's `CHANGELOG.md` is what its generator writes: `cargo run --example changelog --
+  --check` passes straight after scaffolding and regenerating is a no-op (`cargo xtask changelog`
+  on workspaces too). Both generators share the header, `Unreleased` entries carry no commit hash
+  (released ones still do), and CLAUDE.md / CONTRIBUTING.md say the file is generated and name
+  the command whenever the generator ships.
+- Generated docs: the README says a theme is eleven colours, as the themes do; CLAUDE.md and
+  CONTRIBUTING.md no longer claim a check enforces `assert!` messages, and list every place the
+  header check walks (`benches/`, `build.rs` too) with each module-name form; the GUI README lists
+  the Linux runtime libraries; CONTRIBUTING says attestation needs a public repository or GitHub
+  Enterprise Cloud; the release workflow's matrix comment says what else a new target needs.
+- This repo's docs match the code: CONTRACTS lists `post.fetch` and every binary extension the
+  engine copies raw, PLAN's `npm pack` check names `dist/` and `templates/`, and the changelog's
+  CI line names Node 22 and 26 (the `engines` floor is 22.18).
+- This repo's CI pins `actions/setup-node` to a full commit SHA (v7.1.0) and checks out without
+  persisting the token.
 
 ### Changed
 
@@ -96,7 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README documents `--set`, `--bin` and `--preset custom`.
 - Project README covering presets, CLI flags, Rust conventions, and contributing.
 - MIT license, copyright 2026 Lawrence Norton.
-- Node 20, 22, and 26 CI on Linux and Windows, plus per-preset Rust scaffold checks.
+- Node 22 and 26 CI on Linux and Windows, plus per-preset Rust scaffold checks.
 - Weekly Dependabot updates for npm dependencies and GitHub Actions.
 - In-process preset e2e checks for rendered tokens, directives, unique destinations,
   and path-derived Rust module headers.

@@ -49,7 +49,7 @@ test/*.test.ts             node --test
               commandPalette, screenshotExample, demo, subcommands }, // all bool; subcommands: cli or GUI kinds, with clap
   tooling:  { ci, release, cargoDeny, dependabot, toolchainPin, agentDocs, headerCheck,
               unsafeCheck, changelogGen, issueTemplates, codeowners, securityMd }, // all bool
-  post:     { git: bool, cargoCheck: bool, open: 'none'|'code'|'cursor' },
+  post:     { git: bool, fetch: bool, cargoCheck: bool, open: 'none'|'code'|'cursor' },
   preset:   string | null,
 }
 ```
@@ -117,7 +117,8 @@ Unknown tokens throw (so a typo fails tests loudly).
 - Optional `templates/<id>/manifest.js`: `export default function (ctx, files) → files'` where
   `files` is `[{ src, dest }]` (absolute src, relative dest). Use it to drop or rename files.
   Without a manifest all files are included.
-- Binary files (`.png .ico .ttf .otf .woff2 .zip`) are copied raw. Everything else is text and goes
+- Binary files (`.png .ico .ttf .otf .woff .woff2 .zip .jpg .jpeg .gif .wav`, case-insensitive;
+  `BINARY` in `src/engine/plan.ts`) are copied raw. Everything else is text and goes
   through `renderText`.
 - Line directives work in any text file. A line whose trimmed content, after an optional comment
   leader (`//`, `#`, `<!--`, `--`, `;`), is `@if EXPR`, `@elif EXPR`, `@else`, or `@end` (an

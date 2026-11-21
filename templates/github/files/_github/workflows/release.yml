@@ -48,9 +48,13 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
+      # Every checkout here drops its credential: nothing pushes or tags
+      # through git, and `gh` authenticates with `GH_TOKEN`, not with the
+      # token checkout would otherwise leave in .git/config.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.resolve.outputs.tag }}
+          persist-credentials: false
 
       # A tag that disagrees with Cargo.toml would ship a binary whose
       # `--version` contradicts its release page, and cannot be fixed
@@ -100,8 +104,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # The matrix stays a matrix so adding a target later is an entry
-          # rather than a rewrite.
+          # One target today, kept as a matrix so another can be added
+          # without restructuring the job. An entry alone is not enough:
+          # Package copies a hard-coded `.exe` and zips with `7z`, and the
+          # SBOM file name carries no target, so a second entry would
+          # collide with this one's at publish. Parameterise all three
+          # before adding a target.
           - os: windows-latest
             target: x86_64-pc-windows-msvc
     steps:
@@ -111,15 +119,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.draft.outputs.tag }}
+          persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10
         with:
           toolchain: "@@toolchain@@"
           targets: ${{ matrix.target }}
 
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          key: release-${{ matrix.target }}
+      # No build cache, deliberately: the Actions cache is written by any
+      # branch's CI, so a release that restored it could ship whatever a
+      # poisoned entry put there. A release builds from scratch.
 
       - name: Build
 # @if workspace
@@ -231,6 +240,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.draft.outputs.tag }}
+          persist-credentials: false
 
       - name: Download archives
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
