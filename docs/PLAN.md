@@ -230,10 +230,11 @@ all tooling), `tui` (ratatui + crossterm), `lib` (thiserror, no bin, docs.rs met
 ## 5. Verification
 
 1. `node --test`: directives, tokens (no `@@` left), cargo.js output, header module derivation,
-   preset snapshots.
+   per-preset rendered-plan checks. (Snapshot tests of generated trees are not written yet.)
 2. E2E: for each preset scaffold into a temp dir with `--yes --no-git --no-cargo-check`, then
    `cargo fmt --all -- --check`, `cargo clippy --all-targets --all-features -- -D warnings`,
    `cargo test --all-features`. Feature combos: gui + tray + singleInstance + commandPalette;
    cli + tokio + reqwest + sqlite; lib with `MIT OR Apache-2.0`.
 3. Manual: Windows Terminal, PowerShell 5, `NO_COLOR=1`, piped, `CI=1`, `--dry-run`, `--json`.
-4. `npm pack --dry-run` lists only `bin/ src/ templates/`.
+4. `npm pack --dry-run` lists only `dist/` and `templates/` (`package.json` `files`), plus the
+   `package.json`, `README.md` and `LICENSE` npm always adds; no `.ts` source ships.

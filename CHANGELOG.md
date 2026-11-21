@@ -48,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   header check walks (`benches/`, `build.rs` too) with each module-name form; the GUI README lists
   the Linux runtime libraries; CONTRIBUTING says attestation needs a public repository or GitHub
   Enterprise Cloud; the release workflow's matrix comment says what else a new target needs.
+- This repo's docs match the code: CONTRACTS lists `post.fetch` and every binary extension the
+  engine copies raw, PLAN's `npm pack` check names `dist/` and `templates/`, and the changelog's
+  CI line names Node 22 and 26 (the `engines` floor is 22.18).
 - This repo's CI pins `actions/setup-node` to a full commit SHA (v7.1.0) and checks out without
   persisting the token.
 
@@ -87,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README documents `--set`, `--bin` and `--preset custom`.
 - Project README covering presets, CLI flags, Rust conventions, and contributing.
 - MIT license, copyright 2026 Lawrence Norton.
-- Node 20, 22, and 26 CI on Linux and Windows, plus per-preset Rust scaffold checks.
+- Node 22 and 26 CI on Linux and Windows, plus per-preset Rust scaffold checks.
 - Weekly Dependabot updates for npm dependencies and GitHub Actions.
 - In-process preset e2e checks for rendered tokens, directives, unique destinations,
   and path-derived Rust module headers.
