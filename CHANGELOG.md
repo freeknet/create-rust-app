@@ -47,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- TUI projects build on ratatui 0.30 and crossterm 0.29 (were 0.29 and 0.28); the templates needed
+  no code changes, and the scaffold still builds on the 1.98 MSRV.
 - The classic Windows console gets 24-bit colour, block letters and a glyph set its font can draw,
   instead of an ASCII fallback.
 - Motion: shimmering focused option, cycling marker, wave spinner, live file and crate counters,
