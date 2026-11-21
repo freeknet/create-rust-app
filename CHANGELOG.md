@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An MSRV newer than the pinned toolchain, or older than the edition allows (2024 needs 1.85),
   is an argument error (exit 2), whether it came from `--msrv`, `--toolchain`, `--set` or a preset.
   It used to scaffold a project cargo then refused to build.
+- Options the chosen kind ignores (`--preset lib --with tray`, `--preset lib --bin foo`,
+  `--preset cli --gui winit-glow`, `subcommands` on a TUI or without clap) each print a one-line
+  note on stderr instead of vanishing silently; `--quiet` hides them. `--json` reports `guiStack`
+  as `""` for kinds without a GUI, as it already did `themeBase`.
 
 - A release build of a GUI app run from a terminal prints its `--help`, `--version`, usage errors
   and headless output: it attaches to the parent console just before printing

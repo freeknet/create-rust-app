@@ -1,4 +1,4 @@
-import type { Answers, Ctx, TokenKey } from './types.ts';
+import type { Answers, Ctx, PartialAnswers, ReportedAnswers, TokenKey } from './types.ts';
 import { DEFAULT_BASE, shippedTheme } from './gen/themes.ts';
 /** Answers → Ctx (see docs/CONTRACTS.md). */
 
@@ -133,6 +133,44 @@ export function effectiveAnswers(a: Answers): Answers {
   if (!a.crates.clap || !(a.kind === 'cli' || hasGui)) out.features.subcommands = false;
   // A library has no binary, and a binary named like its crate needs no [[bin]] table.
   if (a.kind === 'lib' || a.bin === (a.kind === 'workspace' ? `${a.name}-app` : a.name)) out.bin = '';
+  return out;
+}
+
+/**
+ * What `--json` reports: the effective answers, with `guiStack` blanked like `themeBase` for kinds
+ * without a GUI. The Ctx keeps a stack value (no flag reads it without a GUI), so files don't change.
+ */
+export function reportedAnswers(a: Answers): ReportedAnswers {
+  const out: ReportedAnswers = effectiveAnswers(a);
+  if (!(a.kind === 'gui' || a.kind === 'workspace')) out.guiStack = '';
+  return out;
+}
+
+const KIND_WORDS: Record<Answers['kind'], string> = {
+  cli: 'a command-line tool', gui: 'a desktop app', tui: 'a terminal UI', lib: 'a library', workspace: 'a desktop workspace',
+};
+
+/**
+ * Options the user set explicitly (`overrides`: flags and `--set`) that the chosen kind never
+ * generates, one human sentence each, e.g. `tray is ignored: a library has no desktop window.`
+ * Only options turned on, or given a value, count; asking for `false` is never ignored.
+ */
+export function ignoredOptions(overrides: PartialAnswers, answers: Answers): string[] {
+  const eff = effectiveAnswers(answers);
+  const hasGui = answers.kind === 'gui' || answers.kind === 'workspace';
+  const kind = KIND_WORDS[answers.kind];
+  const out: string[] = [];
+  if (overrides.guiStack !== undefined && !hasGui) out.push(`--gui ${overrides.guiStack} is ignored: ${kind} has no desktop window.`);
+  if (overrides.themeBase !== undefined && !hasGui) out.push(`--base ${overrides.themeBase} is ignored: ${kind} has no desktop window.`);
+  if (overrides.bin && answers.kind === 'lib') out.push(`--bin ${overrides.bin} is ignored: a library has no executable.`);
+  for (const [k, v] of Object.entries(overrides.features ?? {}) as [keyof Answers['features'], boolean][]) {
+    if (v !== true || eff.features[k]) continue;
+    let why = `${kind} has no desktop window`;
+    if (k === 'config') why = answers.kind === 'cli' ? 'a command-line tool reads a config file only with serde' : `${kind} ships no config file`;
+    if (k === 'subcommands') why = answers.kind === 'cli' || hasGui ? 'subcommands need clap (--with clap)' : `${kind} has no command line to add them to`;
+    out.push(`${k} is ignored: ${why}.`);
+  }
+  if (overrides.tooling?.unsafeCheck === true && !eff.tooling.unsafeCheck) out.push(`unsafeCheck is ignored: only the desktop kinds have an unsafe boundary to check.`);
   return out;
 }
 

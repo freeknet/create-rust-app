@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, resolve, relative } from 'node:path';
 import { parseArgv, optionalUi, renderHelp } from './args.ts';
 import { DEFAULTS, resolveAnswers } from './presets.ts';
-import { buildContext, effectiveAnswers, validateName, validateRustVersions } from './context.ts';
+import { buildContext, effectiveAnswers, ignoredOptions, reportedAnswers, validateName, validateRustVersions } from './context.ts';
 import { buildPlan } from './engine/plan.ts';
 import { targetProblem, writePlan } from './engine/write.ts';
 import { initRepo } from './post/git.ts';
@@ -227,6 +227,8 @@ export async function main(argv: string[]) {
     // Cross-field checks, after flags, --set and preset defaults have all applied.
     const versionProblem = validateRustVersions(answers.msrv, answers.toolchain, answers.edition);
     if (versionProblem) throw new Exit(2, versionProblem);
+    // Explicit options this kind never generates are dropped, not errors; a scripted run says so.
+    if (!interactive) for (const line of ignoredOptions(overrides, answers)) notice(line);
 
     const ctx = buildContext(answers);
     const plan = await buildPlan(ctx);
@@ -237,8 +239,8 @@ export async function main(argv: string[]) {
 
     if (json) {
       if (!flags['dry-run']) await writePlan(plan, target, { force: Boolean(flags.force) });
-      // Report what was generated: options this kind never uses read false (#6).
-      console.log(JSON.stringify({ answers: effectiveAnswers(answers), files: dests }, null, 2));
+      // Report what was generated: options this kind never uses read false (#6), and no GUI stack.
+      console.log(JSON.stringify({ answers: reportedAnswers(answers), files: dests }, null, 2));
       return 0;
     }
     if (flags['dry-run']) {

@@ -66,7 +66,12 @@ test/*.test.ts             node --test
 
 `buildContext(answers)` first applies `effectiveAnswers(answers)` (src/context.ts): options the kind
 never generates are set to `false` (desktop features and `unsafeCheck` without a GUI; `config` for
-`lib`, `tui`, and `cli` without serde). The Ctx and `--json` both carry these effective values.
+`lib`, `tui`, and `cli` without serde). The Ctx and `--json` both carry these effective values;
+`--json` reports `reportedAnswers(answers)` (type `ReportedAnswers`), which also reads `guiStack: ''`
+without a GUI, like `themeBase`. The Ctx keeps a stack value there; no flag or token reads it.
+`ignoredOptions(overrides, answers) → string[]` names each explicitly given option the kind drops
+(`--with tray` on a lib, `--bin` on a lib, `--gui` without a GUI, `subcommands` without clap or on a
+TUI/lib …); a non-interactive run prints each as a `note:` line on stderr unless `--quiet`.
 It then adds: `crate` (snake), `Name` (Pascal), `NAME` (SCREAMING),
 `year`, `appCrate` (workspace: `<name>-app`, else `<name>`), `flags: Set<string>`, `tokens`.
 
