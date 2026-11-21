@@ -229,7 +229,11 @@ fn shortcuts(ui: &Ui, actions: &mut Vec<Action>) {
 }
 
 /// Ctrl+1, Ctrl+2, … open the pages in sidebar order, so a new page gets
+// @if commandPalette
 /// its shortcut (and its command palette entry) without further wiring.
+// @else
+/// its shortcut without further wiring.
+// @end
 const PAGE_KEYS: [Key; 9] = [
     Key::Num1,
     Key::Num2,

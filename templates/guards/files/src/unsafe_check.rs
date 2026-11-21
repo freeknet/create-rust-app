@@ -9,9 +9,13 @@
 //!
 //! Compiler lints verify local mechanics such as safety comments. This
 //! test enforces repository-level rules the compiler cannot express:
-//! unsafe stays under `src/win/` or `src/gui/run/`, tests never need it, and unsafe APIs
-//! are forbidden, and one function cannot accumulate multiple unsafe
-//! operations.
+// @if gui_winit_glow
+//! unsafe stays under `src/win/` or `src/gui/run/`, tests never need it,
+// @else
+//! unsafe stays under `src/win/`, tests never need it,
+// @end
+//! unsafe APIs are forbidden, and one function cannot accumulate multiple
+//! unsafe operations.
 
 #[cfg(test)]
 mod tests {
@@ -19,6 +23,13 @@ mod tests {
     use std::collections::HashMap;
     use std::fs;
     use std::path::{Path, PathBuf};
+
+    /// Where unsafe code may live, as the failure message names it.
+    // @if gui_winit_glow
+    const ALLOWED: &str = "src/win/ or src/gui/run/";
+    // @else
+    const ALLOWED: &str = "src/win/";
+    // @end
 
     /// Finds every Rust source below `root`.
     fn rust_sources(root: &Path) -> Result<Vec<PathBuf>> {
@@ -85,9 +96,7 @@ mod tests {
                 }
                 let location = format!("{relative}:{}", index + 1);
                 if !relative.starts_with("src/win/") && !relative.starts_with("src/gui/run/") {
-                    failures.push(format!(
-                        "{location}: unsafe code must live under src/win/ or src/gui/run/"
-                    ));
+                    failures.push(format!("{location}: unsafe code must live under {ALLOWED}"));
                 }
                 if test_start.is_some_and(|start| index > start) {
                     failures.push(format!("{location}: test code must use safe wrappers"));
